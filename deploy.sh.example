@@ -1,0 +1,20 @@
+#!/bin/sh
+# Example deploy script: copy to deploy.sh and set your host.
+# Syncs the working tree to the server and rebuilds the container there.
+# `up -d --build` only replaces the running container once the new image
+# builds, so a failed build leaves the current version up.
+# Rooms are in memory, so a redeploy ends any games in progress.
+set -e
+
+HOST="your-server"            # ssh host or alias from ~/.ssh/config
+REMOTE_DIR="/path/to/mtg_game"
+
+rsync -avz --progress \
+  --exclude '.git' \
+  --exclude '.venv' \
+  --exclude '__pycache__' \
+  --exclude '.pytest_cache' \
+  --exclude 'deploy.sh' \
+  ./ "$HOST:$REMOTE_DIR"
+
+ssh "$HOST" "cd '$REMOTE_DIR' && docker compose up -d --build"

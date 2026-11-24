@@ -1,0 +1,7 @@
+services:
+  mtg-tracker:
+    container_name: mtg-tracker
+    build: .
+    ports:
+      - "8086:8000"  # host port 8000 is taken on starstorm (ArchiveBox)
+    restart: unless-stopped

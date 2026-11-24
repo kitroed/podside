@@ -10,7 +10,9 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
+
+import qr
 
 from actions import handle_action
 from models import COMMANDER_DAMAGE_LETHAL, DEFAULT_STARTING_LIFE, POISON_LETHAL, ActionError, Player, Room
@@ -179,6 +181,8 @@ DISPLAY_PAGE = """<!doctype html>
  .join{flex:1;min-width:0;font-size:3.4vh;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .join b{color:var(--fg);font-weight:600}
  .join .bad{color:var(--warn)}
+ .hqr{flex-shrink:0;width:9vh;height:9vh;border-radius:.6vh;display:block}
+ .hqr[hidden]{display:none}
  .code{flex-shrink:0;font-size:6vh;font-weight:800;letter-spacing:.35em;margin-right:-.35em;line-height:1}
  .status{font-size:3vh;padding:.6vh 1.8vh;border-radius:99px;background:var(--warn);color:#000;font-weight:700}
  .status[hidden]{display:none}
@@ -206,6 +210,7 @@ DISPLAY_PAGE = """<!doctype html>
  .empty{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3vh;text-align:center}
  .empty .big{font-size:8vh;font-weight:800}
  .empty .url{font-size:5vh;color:var(--dim)}.empty .url b{color:var(--fg)}
+ .empty .qr{width:min(40vh,40vw);height:min(40vh,40vw);border-radius:1.4vh}
 
  .gear{position:fixed;right:2vh;bottom:2vh;width:7vh;height:7vh;border-radius:50%;border:0;
    background:#ffffff14;font-size:3.6vh;opacity:.35}
@@ -229,6 +234,7 @@ DISPLAY_PAGE = """<!doctype html>
   <div class="join" id="join"></div>
   <div class="status" id="status" hidden>reconnecting…</div>
   <div class="code" aria-label="Room code">__CODE__</div>
+  <img class="hqr" id="hqr" alt="QR code to join" hidden>
 </header>
 <main id="tiles"></main>
 
@@ -256,6 +262,9 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const colorOf = pid => COLORS[(parseInt(pid.slice(1), 10) - 1) % COLORS.length];
 const STARTING_LIFE_PRESETS = [20, 25, 30, 40];
+// The server draws the QR code; we pass the address this page was opened at so it matches the proxy's domain.
+const QR_SRC = `/api/rooms/${CODE}/qr.svg?base=${encodeURIComponent(location.origin)}`;
+$("hqr").src = QR_SRC;
 
 let ws = null, state = null, retry = 0, prevLife = {}, resetArmed = null;
 
@@ -315,8 +324,9 @@ function render() {
   const names = Object.fromEntries(players.map(p => [p.id, p.name]));
   if (!players.length) {
     main.style.gridTemplateColumns = "1fr";
-    main.innerHTML = `<div class="empty"><div class="big">Waiting for players</div>
-      <div class="url">Join at ${joinHtml()}</div></div>`;
+    main.innerHTML = `<div class="empty"><div class="big">Scan to join</div>
+      <img class="qr" src="${QR_SRC}" alt="QR code to join">
+      <div class="url">or go to ${joinHtml()}</div></div>`;
   } else {
     const cols = columns(players.length);
     main.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
@@ -328,6 +338,7 @@ function render() {
   }
   prevLife = Object.fromEntries(players.map(p => [p.id, p.life]));
   $("join").innerHTML = players.length ? `Join at ${joinHtml()}` : "";
+  $("hqr").hidden = !players.length;  // the empty screen shows a big one instead
   $("edits").setAttribute("aria-pressed", state.table_edits);
   $("edits").textContent = state.table_edits ? "On" : "Off";
   $("startLife").textContent = state.starting_life;
@@ -718,4 +729,14 @@ async def display_page(code: str) -> str:
 @app.get("/play/{code}", response_class=HTMLResponse)
 async def play_page(code: str) -> str:
     return _render(PLAYER_PAGE, _room_code(code))
+
+
+@app.get("/api/rooms/{code}/qr.svg")
+async def room_qr(
+    code: str,
+    base: str = Query(max_length=200, pattern=r"^https?://[A-Za-z0-9.\-\[\]:]+$"),
+) -> Response:
+    """QR code for {base}/play/{code}. The display passes its own origin as base."""
+    svg = qr.svg(f"{base}/play/{_room_code(code)}")
+    return Response(svg, media_type="image/svg+xml", headers={"Cache-Control": "max-age=3600"})
 

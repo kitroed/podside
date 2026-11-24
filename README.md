@@ -63,6 +63,7 @@ HTTPS matters for more than security: browsers only let the display keep the scr
 |---|---|---|
 | `POST` | `/api/rooms?starting_life=40` | Create a room. Returns `code`, `display_url`, `play_url` |
 | `GET` | `/api/rooms/{code}` | Current room snapshot |
+| `GET` | `/api/rooms/{code}/qr.svg?base=https://host` | QR code (SVG) for `{base}/play/{code}`. The display passes its own origin, so the code matches the proxy's domain. `base` must be `http(s)://host[:port]` with no path |
 | `GET` | `/` | Landing page with a "Create room" button |
 | `GET` | `/display/{code}` | Display view for the TV |
 | `GET` | `/play/{code}` | Player view for phones |
@@ -110,6 +111,7 @@ Connect to `/ws/{code}?role=display` or `/ws/{code}?role=player[&token=...]`. Al
 | `rooms.py` | `RoomManager` and the shared `manager`: create/get rooms, idle cleanup |
 | `actions.py` | `handle_action()`: validates and applies each action type |
 | `app.py` | FastAPI routes, the `/ws/{code}` endpoint, `broadcast_state()`, and the inline HTML pages: the landing page, the display view and the player view |
+| `qr.py` | Small QR encoder (byte mode, level M) with no dependencies, used for the join code |
 | `main.py` | Entry point that re-exports `app`, so `uvicorn main:app` works |
 | `tests/` | pytest suite. `conftest.py` has a `Table` helper that drives a display and several players over real WebSockets |
 
@@ -121,7 +123,7 @@ Run the tests with `pip install pytest && pytest -q`.
 - [x] Split `main.py` into modules: `models.py`, `rooms.py`, `actions.py`, `app.py`
 - [x] Turn the ad-hoc test script into a `pytest` suite (multi-client, permissions, undo, reconnect)
 - [x] Real **display view**: large tiles, commander damage on each tile (colored by source), eliminated-player styling, the join link, and a Wake Lock so the TV doesn't sleep
-- [ ] QR code to join on the display (needs a QR library or a hand-rolled encoder)
+- [x] QR code to join on the display (hand-rolled encoder in `qr.py`, served as SVG)
 - [x] Real **player view**: big +/- buttons, hold to repeat, a commander damage picker, undo
 - [ ] Batch rapid taps for about 400 ms so the display shows "−5" instead of five −1s
 - [ ] Static files in `static/` and templates in place of the inline HTML

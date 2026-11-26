@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Five deck colors seated around the TV scoreboard (16:9): a pod. Full-bleed so home screens can round the corners. -->
+  <!-- The pod seated around the TV scoreboard (16:9): two on each long side, one at each end.
+       Full-bleed so home screens can round the corners. -->
   <defs>
     <radialGradient id="bg" cx="50%" cy="0%" r="100%">
       <stop offset="0" stop-color="#1f2a40"/>
@@ -7,12 +8,13 @@
     </radialGradient>
   </defs>
   <rect width="512" height="512" fill="url(#bg)"/>
-  <rect x="112" y="163" width="288" height="162" rx="16" fill="#26324d" stroke="#7d8fb5" stroke-width="10"/>
+  <rect x="104" y="170.5" width="304" height="171" rx="16" fill="#26324d" stroke="#7d8fb5" stroke-width="10"/>
   <g stroke="#0b0d10" stroke-width="8">
-    <circle cx="256.0" cy="86.0" r="58" fill="#f3ecd0"/>
-    <circle cx="417.7" cy="203.5" r="58" fill="#2f7fd0"/>
-    <circle cx="355.9" cy="393.5" r="58" fill="#1d1917" stroke="#a89f96"/>
-    <circle cx="156.1" cy="393.5" r="58" fill="#d94a3a"/>
-    <circle cx="94.3" cy="203.5" r="58" fill="#2e9a5b"/>
+    <circle cx="176" cy="140.5" r="46" fill="#f3ecd0"/>
+    <circle cx="336" cy="140.5" r="46" fill="#2f7fd0"/>
+    <circle cx="438" cy="256" r="46" fill="#1d1917" stroke="#a89f96"/>
+    <circle cx="336" cy="371.5" r="46" fill="#d94a3a"/>
+    <circle cx="176" cy="371.5" r="46" fill="#2e9a5b"/>
+    <circle cx="74" cy="256" r="46" fill="#b9b3ad"/>
   </g>
 </svg>

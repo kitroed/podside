@@ -205,15 +205,16 @@ __PIP_CSS__ :root{--bg:#0b0d10;--tile:#171a21;--fg:#f4f5f7;--dim:#9aa1ad;--warn:
    border-top:1.4vh solid var(--c);display:flex;flex-direction:column;align-items:center;
    justify-content:space-between;padding:3cqh 4cqw;min-height:0;overflow:hidden;transition:background .6s}
  .tile.bump{background:#262b36;transition:none}
- .delta{position:absolute;top:4cqh;right:4cqw;font-size:min(15cqh,11cqw);font-weight:800;line-height:1;
+ .delta{position:absolute;top:4cqh;left:4cqw;font-size:min(15cqh,11cqw);font-weight:800;line-height:1;
    padding:.12em .35em;border-radius:.3em;background:#0b0d10cc;font-variant-numeric:tabular-nums;
    animation:delta-fade var(--ms) linear forwards;animation-delay:var(--age)}
  .delta.loss{color:var(--lethal)}.delta.gain{color:#3dd68c}
  .delta small{font-size:.45em;font-weight:700;color:var(--dim);margin-left:.25em}
  @keyframes delta-fade{0%,75%{opacity:1}100%{opacity:0}}
- .name{font-size:min(13cqh,11cqw);font-weight:700;max-width:100%;display:flex;align-items:center;gap:.3em}
- .name .nm{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
- .tile.out .pips{opacity:.45}
+ .name{font-size:min(13cqh,11cqw);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+ /* Deck pips sit in the top-right corner, a little above the name. fitNames() shortens a name only if it reaches them. */
+ .tile > .pips{position:absolute;top:2.2cqh;right:3cqw;font-size:min(14cqh,11.5cqw,6.5vh)}
+ .tile.out > .pips{opacity:.45}
  .life{font-size:min(48cqh,40cqw);font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
  .life.low{color:var(--warn)}
  .extras{display:flex;flex-wrap:wrap;justify-content:center;gap:2cqh 3cqw;font-size:min(9cqh,7.5cqw);min-height:1.2em}
@@ -339,7 +340,8 @@ function tile(p, names) {
   const out = p.eliminated, low = !out && p.life <= 10 ? "low" : "";
   const bottom = out ? `<span class="pill">${esc(outReason(p, names))}</span>` : extras.join("");
   return `<section class="tile ${out ? "out" : ""}" data-pid="${esc(p.id)}" style="--c:${colorOf(p.id)}">
-    <div class="name"><span class="nm">${esc(p.name)}</span>${pips(p.colors)}</div>
+    <div class="name">${esc(p.name)}</div>
+    ${pips(p.colors)}
     <div class="life ${low}">${out ? "OUT" : p.life}</div>
     <div class="extras">${bottom}</div>
     ${delta && delta.pid === p.id ? deltaHtml() : ""}
@@ -393,6 +395,7 @@ function render() {
     }
   }
   prevLife = Object.fromEntries(players.map(p => [p.id, p.life]));
+  fitNames();
   $("join").innerHTML = players.length ? `Join at ${joinHtml()}` : "";
   $("hqr").hidden = !players.length;  // the empty screen shows a big one instead
   $("edits").setAttribute("aria-pressed", state.table_edits);
@@ -465,6 +468,25 @@ document.addEventListener("click", keepAwake);  // some browsers only grant it a
 keepAwake().then(ok => {
   if (!ok && !window.isSecureContext) toast("This screen may sleep: keeping it awake needs HTTPS or localhost", 10000);
 });
+
+
+// Names are centered under the tile's top edge; deck pips sit in the top-right corner. If a name
+// runs into the pips, shorten it (symmetrically, so it stays centered) to end just before them,
+// unless that would leave under ~half the tile: then move the name down to just below the pips.
+function fitNames() {
+  for (const t of document.querySelectorAll(".tile")) {
+    const name = t.querySelector(".name"), pipsEl = t.querySelector(":scope > .pips");
+    name.style.maxWidth = name.style.marginTop = "";
+    if (!pipsEl) continue;
+    const nr = name.getBoundingClientRect(), pr = pipsEl.getBoundingClientRect(), tr = t.getBoundingClientRect();
+    const gap = pr.height * 0.4;
+    if (pr.bottom <= nr.top || nr.right <= pr.left - gap) continue;  // already clear
+    const room = 2 * (pr.left - gap - (tr.left + tr.width / 2));
+    if (room >= tr.width * 0.45) name.style.maxWidth = room + "px";
+    else name.style.marginTop = (pr.bottom - nr.top + gap * 0.5) + "px";
+  }
+}
+addEventListener("resize", fitNames);
 
 connect();
 </script>

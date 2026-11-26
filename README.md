@@ -1,8 +1,6 @@
-# EDH Table
+# Podside
 
 A life tracker for in-person Commander (EDH) games of Magic: The Gathering, built for pods of three or more. A shared **table display** (TV, monitor or tablet in a browser) shows every player's totals, and each player controls their own totals from **their phone**, the way Jackbox works.
-
-Existing apps (Playgroup.gg, Sideboard, Signet, Moxtopper) either run on one shared device or sync phone to phone. None of them have a real big-screen view that is separate from the phones. That gap is what this project is for.
 
 ## Status
 

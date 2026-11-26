@@ -18,7 +18,7 @@ from actions import handle_action
 from models import COMMANDER_DAMAGE_LETHAL, DEFAULT_STARTING_LIFE, POISON_LETHAL, ActionError, Player, Room
 from rooms import manager
 
-log = logging.getLogger("mtg")
+log = logging.getLogger("podside")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 
@@ -57,7 +57,7 @@ async def lifespan(_: FastAPI):
     task.cancel()
 
 
-app = FastAPI(title="EDH Table", lifespan=lifespan)
+app = FastAPI(title="Podside", lifespan=lifespan)
 
 
 @app.post("/api/rooms")
@@ -167,7 +167,7 @@ INDEX_PAGE = """<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0d10">
 <meta name="description" content="Life totals on the big screen, controls on every phone. Built for EDH pods.">
-<title>EDH Table</title>
+<title>Podside</title>
 <style>
 __PIP_CSS__ :root{--bg:#0b0d10;--card:#171a21;--fg:#f4f5f7;--dim:#9aa1ad;--accent:#3e63dd;--warn:#ffb224}
  *{box-sizing:border-box}
@@ -197,7 +197,7 @@ __PIP_CSS__ :root{--bg:#0b0d10;--card:#171a21;--fg:#f4f5f7;--dim:#9aa1ad;--accen
 <body>
 <header class="hero">
   <div class="pips" aria-hidden="true"><span class="pip pip-W">W</span><span class="pip pip-U">U</span><span class="pip pip-B">B</span><span class="pip pip-R">R</span><span class="pip pip-G">G</span></div>
-  <h1>EDH Table</h1>
+  <h1>Podside</h1>
   <p class="tag">Life totals on the big screen. Controls on every phone.</p>
 </header>
 <main class="cards">
@@ -265,7 +265,7 @@ DISPLAY_PAGE = """<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Room __CODE__ · EDH Table</title>
+<title>Room __CODE__ · Podside</title>
 <style>
 __PIP_CSS__ :root{--bg:#0b0d10;--tile:#171a21;--fg:#f4f5f7;--dim:#9aa1ad;--warn:#ffb224;--lethal:#ff4d4f;--radius:1.6vh}
  *{box-sizing:border-box}
@@ -635,7 +635,7 @@ PLAYER_PAGE = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0d10">
-<title>Room __CODE__ · EDH Table</title>
+<title>Room __CODE__ · Podside</title>
 <style>
 __PIP_CSS__ :root{--bg:#0b0d10;--card:#171a21;--btn:#262b36;--fg:#f4f5f7;--dim:#9aa1ad;--warn:#ffb224;--lethal:#ff4d4f;--c:#343a48}
  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -724,7 +724,7 @@ __PIP_CSS__ :root{--bg:#0b0d10;--card:#171a21;--btn:#262b36;--fg:#f4f5f7;--dim:#
 </style></head>
 <body>
 <header>
-  <button class="me" id="me" aria-label="Edit name and deck colors">EDH Table</button>
+  <button class="me" id="me" aria-label="Edit name and deck colors">Podside</button>
   <span class="status" id="status" hidden>reconnecting…</span>
   <span class="room">__CODE__</span>
   <button class="fs" id="fs" aria-label="Full screen" aria-pressed="false" hidden></button>
@@ -786,7 +786,7 @@ __PIP_CSS__ :root{--bg:#0b0d10;--card:#171a21;--btn:#262b36;--fg:#f4f5f7;--dim:#
 const CODE = "__CODE__";
 const POISON_LETHAL = __POISON_LETHAL__, CMD_LETHAL = __CMD_LETHAL__;
 const COLORS = __COLORS__;
-__PIP_JS__const TOKEN_KEY = "mtg-token-" + CODE;
+__PIP_JS__const TOKEN_KEY = "podside-token-" + CODE;
 const HOLD_DELAY = 400, HOLD_EVERY = 120;  // ms before repeating, then between repeats
 
 const $ = id => document.getElementById(id);
@@ -850,7 +850,7 @@ function show(which) {
 function render() {
   const p = me && state.players.find(x => x.id === me);
   if (!p) {
-    $("me").textContent = "EDH Table";
+    $("me").textContent = "Podside";
     $("joinNote").textContent = me ? "You were removed from this game. Join again to get a new seat."
                                    : "Your name shows on the table display.";
     if ($("join").hidden) { show("join"); }

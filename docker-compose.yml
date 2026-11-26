@@ -1,6 +1,8 @@
+name: podside  # fixed project name, so it doesn't depend on the folder's name
+
 services:
-  mtg-tracker:
-    container_name: mtg-tracker
+  podside:
+    container_name: podside
     build: .
     ports:
       - "8086:8000"  # host port 8000 is taken on starstorm (ArchiveBox)

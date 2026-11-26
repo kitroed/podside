@@ -31,7 +31,7 @@ def test_unknown_room_404(client: TestClient) -> None:
 
 def test_index(client: TestClient) -> None:
     html = client.get("/").text
-    assert "<title>EDH Table</title>" in html
+    assert "<title>Podside</title>" in html
     assert 'id="start"' in html and 'id="code"' in html  # start a game, join by code
     assert "__" not in html  # pip CSS placeholder filled in
 

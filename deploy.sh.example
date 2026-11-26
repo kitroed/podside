@@ -7,7 +7,7 @@
 set -e
 
 HOST="your-server"            # ssh host or alias from ~/.ssh/config
-REMOTE_DIR="/path/to/mtg_game"
+REMOTE_DIR="/path/to/podside"
 
 rsync -avz --progress \
   --exclude '.git' \

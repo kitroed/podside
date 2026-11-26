@@ -86,7 +86,7 @@ def test_smallest_version_is_chosen(text: str, version: int) -> None:
     assert len(m) == version * 4 + 17 and all(len(row) == len(m) for row in m)
 
 
-@pytest.mark.parametrize("text", ["a", "https://mtg.oktired.com/play/ABCD", "x" * 150])
+@pytest.mark.parametrize("text", ["a", "https://edh.oktired.com/play/ABCD", "x" * 150])
 def test_function_patterns(text: str) -> None:
     m = qr.encode(text)
     size = len(m)
@@ -101,7 +101,7 @@ def test_function_patterns(text: str) -> None:
 
 @pytest.mark.parametrize(
     "text",
-    ["a", "MTG", "https://mtg.oktired.com/play/ABCD", "http://192.168.0.101:8086/play/WXYZ", "Ünïcødé 🃏", "z" * 42],
+    ["a", "MTG", "https://edh.oktired.com/play/ABCD", "http://192.168.0.101:8086/play/WXYZ", "Ünïcødé 🃏", "z" * 42],
 )
 def test_round_trip_small_versions(text: str) -> None:
     assert decode_single_block(qr.encode(text)) == text
@@ -128,10 +128,10 @@ def test_svg() -> None:
 
 
 def test_room_qr_endpoint(client: TestClient, room_code: str) -> None:
-    r = client.get(f"/api/rooms/{room_code.lower()}/qr.svg", params={"base": "https://mtg.oktired.com"})
+    r = client.get(f"/api/rooms/{room_code.lower()}/qr.svg", params={"base": "https://edh.oktired.com"})
     assert r.status_code == 200
     assert r.headers["content-type"] == "image/svg+xml"
-    assert r.text == qr.svg(f"https://mtg.oktired.com/play/{room_code}")
+    assert r.text == qr.svg(f"https://edh.oktired.com/play/{room_code}")
 
 
 def test_room_qr_unknown_room(client: TestClient) -> None:

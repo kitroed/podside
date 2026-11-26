@@ -16,7 +16,7 @@ from models import (
     Room,
 )
 
-log = logging.getLogger("mtg")
+log = logging.getLogger("podside")
 
 
 class RoomManager:

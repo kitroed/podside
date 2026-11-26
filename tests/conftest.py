@@ -23,9 +23,31 @@ def client() -> Iterator[TestClient]:
     manager.rooms.clear()
 
 
+class FakeClock:
+    """Room clock for tests. Each reading advances by `step` seconds; the default
+    of 1s keeps actions outside the grouping window, like a slow player."""
+
+    def __init__(self, step: float = 1.0) -> None:
+        self.now = 1_000_000.0
+        self.step = step
+
+    def __call__(self) -> float:
+        self.now += self.step
+        return self.now
+
+
 @pytest.fixture
-def room_code(client: TestClient) -> str:
-    return client.post("/api/rooms").json()["code"]
+def clock() -> FakeClock:
+    return FakeClock()
+
+
+@pytest.fixture
+def room_code(client: TestClient, clock: FakeClock) -> str:
+    code = client.post("/api/rooms").json()["code"]
+    room = manager.get(code)
+    assert room is not None
+    room.clock = clock
+    return code
 
 
 class Conn:

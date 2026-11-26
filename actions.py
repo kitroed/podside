@@ -35,7 +35,8 @@ def handle_action(room: Room, actor: Player | None, msg: dict[str, Any]) -> None
 
     if kind == "life":
         p = target_player()
-        room.commit(actor_id, msg, [(p.id, "life", None, as_delta(msg.get("delta")))])
+        delta = as_delta(msg.get("delta"))
+        room.commit(actor_id, {"type": "life", "target": p.id, "delta": delta}, [(p.id, "life", None, delta)])
 
     elif kind == "poison":
         p = target_player()
@@ -43,7 +44,7 @@ def handle_action(room: Room, actor: Player | None, msg: dict[str, Any]) -> None
         delta = max(delta, -p.poison)  # don't go below zero; keep undo exact
         if delta == 0:
             return
-        room.commit(actor_id, msg, [(p.id, "poison", None, delta)])
+        room.commit(actor_id, {"type": "poison", "target": p.id, "delta": delta}, [(p.id, "poison", None, delta)])
 
     elif kind == "cmd_damage":
         p = target_player()
@@ -55,14 +56,16 @@ def handle_action(room: Room, actor: Player | None, msg: dict[str, Any]) -> None
         if delta == 0:
             return
         # Commander damage is also life loss; record both so undo reverts both.
-        room.commit(actor_id, msg, [(p.id, "cmd_damage", source, delta), (p.id, "life", None, -delta)])
+        action = {"type": "cmd_damage", "target": p.id, "source": source, "delta": delta}
+        room.commit(actor_id, action, [(p.id, "cmd_damage", source, delta), (p.id, "life", None, -delta)])
 
     elif kind == "counter":
         p = target_player()
         name = clean_name(msg.get("name")).lower()
         if not name:
             raise ActionError("Counter name required")
-        room.commit(actor_id, msg, [(p.id, "counters", name, as_delta(msg.get("delta")))])
+        delta = as_delta(msg.get("delta"))
+        room.commit(actor_id, {"type": "counter", "target": p.id, "name": name, "delta": delta}, [(p.id, "counters", name, delta)])
 
     elif kind == "rename":
         p = target_player()

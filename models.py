@@ -6,6 +6,7 @@ import asyncio
 import secrets
 import string
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -20,6 +21,7 @@ DEFAULT_STARTING_LIFE = 40
 ROOM_IDLE_TTL_SECONDS = 6 * 60 * 60  # drop rooms nobody has touched in 6h
 CLEANUP_INTERVAL_SECONDS = 10 * 60
 UNDO_DEPTH = 200
+GROUP_WINDOW_SECONDS = 0.4  # repeats of the same action this close together share one history entry
 MAX_DELTA = 1000  # sanity cap on a single action
 ROOM_CODE_ALPHABET = "".join(c for c in string.ascii_uppercase if c not in "IO")  # no I/O confusion
 ROOM_CODE_LENGTH = 4
@@ -79,10 +81,35 @@ Change = tuple[str, str, str | None, int]
 @dataclass
 class LogEntry:
     seq: int
-    ts: float
+    ts: float  # time of the latest action folded into this entry
     actor: str  # player id or "display"
-    action: dict[str, Any]
+    action: dict[str, Any]  # normalised action; "delta" is the group's total
     changes: list[Change]
+    closed: bool = False  # set once an undo exposes this entry, so new taps start a fresh group
+
+    def can_absorb(self, actor: str, action: dict[str, Any], now: float) -> bool:
+        def key(a: dict[str, Any]) -> dict[str, Any]:
+            return {k: v for k, v in a.items() if k != "delta"}
+
+        return (
+            not self.closed
+            and self.actor == actor
+            and "delta" in action
+            and key(self.action) == key(action)
+            and now - self.ts <= GROUP_WINDOW_SECONDS
+        )
+
+    def absorb(self, action: dict[str, Any], changes: list[Change], now: float) -> None:
+        totals: dict[tuple[str, str, str | None], int] = {}
+        for pid, fld, key, delta in [*self.changes, *changes]:
+            totals[(pid, fld, key)] = totals.get((pid, fld, key), 0) + delta
+        self.changes = [(pid, fld, key, d) for (pid, fld, key), d in totals.items()]
+        self.action = {**self.action, "delta": self.action["delta"] + action["delta"]}
+        self.ts = now
+
+    @property
+    def is_noop(self) -> bool:
+        return all(d == 0 for *_, d in self.changes)
 
 
 @dataclass
@@ -96,6 +123,7 @@ class Room:
     connections: set[WebSocket] = field(default_factory=set)
     last_activity: float = field(default_factory=time.time)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    clock: Callable[[], float] = field(default=time.time, repr=False)  # replaceable in tests
     _next_player_num: int = 1
 
     # ---- players --------------------------------------------------------
@@ -151,7 +179,15 @@ class Room:
         for c in changes:
             self._apply_change(c)
         self.seq += 1
-        self.history.append(LogEntry(self.seq, time.time(), actor, action, changes))
+        now = self.clock()
+        last = self.history[-1] if self.history else None
+        # Rapid repeats (taps, or a held button) become one entry: one undo step, one running total.
+        if last and last.can_absorb(actor, action, now):
+            last.absorb(action, changes, now)
+            if last.is_noop:  # e.g. +1 then -1: nothing left to undo
+                self.history.pop()
+            return
+        self.history.append(LogEntry(self.seq, now, actor, action, changes))
         if len(self.history) > UNDO_DEPTH:
             self.history.pop(0)
 
@@ -163,6 +199,8 @@ class Room:
                 for c in reversed(entry.changes):
                     self._apply_change(c, sign=-1)
                 self.seq += 1
+                if self.history:
+                    self.history[-1].closed = True
                 return entry
         raise ActionError("Nothing to undo")
 

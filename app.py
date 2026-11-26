@@ -192,6 +192,12 @@ DISPLAY_PAGE = """<!doctype html>
    border-top:1.4vh solid var(--c);display:flex;flex-direction:column;align-items:center;
    justify-content:space-between;padding:3cqh 4cqw;min-height:0;overflow:hidden;transition:background .6s}
  .tile.bump{background:#262b36;transition:none}
+ .delta{position:absolute;top:4cqh;right:4cqw;font-size:min(15cqh,11cqw);font-weight:800;line-height:1;
+   padding:.12em .35em;border-radius:.3em;background:#0b0d10cc;font-variant-numeric:tabular-nums;
+   animation:delta-fade var(--ms) linear forwards;animation-delay:var(--age)}
+ .delta.loss{color:var(--lethal)}.delta.gain{color:#3dd68c}
+ .delta small{font-size:.45em;font-weight:700;color:var(--dim);margin-left:.25em}
+ @keyframes delta-fade{0%,75%{opacity:1}100%{opacity:0}}
  .name{font-size:min(13cqh,11cqw);font-weight:700;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .life{font-size:min(48cqh,40cqw);font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
  .life.low{color:var(--warn)}
@@ -267,6 +273,9 @@ const QR_SRC = `/api/rooms/${CODE}/qr.svg?base=${encodeURIComponent(location.ori
 $("hqr").src = QR_SRC;
 
 let ws = null, state = null, retry = 0, prevLife = {}, resetArmed = null;
+// Running total for the latest action, e.g. "−5" after five quick taps (the server groups them).
+const DELTA_MS = 2500;
+let seen = null, delta = null, deltaTimer = null;
 
 // ---- connection -------------------------------------------------------------
 
@@ -276,7 +285,7 @@ function connect() {
   ws.onopen = () => { retry = 0; $("status").hidden = true; };
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
-    if (m.type === "state") { state = m.state; render(); }
+    if (m.type === "state") { state = m.state; trackDelta(); render(); }
     else if (m.type === "error") toast(m.message);
   };
   ws.onclose = () => {
@@ -316,11 +325,41 @@ function tile(p, names) {
     <div class="name">${esc(p.name)}</div>
     <div class="life ${low}">${out ? "OUT" : p.life}</div>
     <div class="extras">${bottom}</div>
+    ${delta && delta.pid === p.id ? deltaHtml() : ""}
   </section>`;
+}
+
+const signed = n => (n > 0 ? "+" : "−") + Math.abs(n);
+
+function trackDelta() {
+  // Show a bubble only for a new action or a growing group, never for an undo or on (re)connect.
+  const la = state.last_action;
+  const key = la && {seq: la.seq, delta: la.action.delta};
+  const fresh = seen && la && (la.seq > seen.seq || (la.seq === seen.seq && la.action.delta !== seen.delta));
+  if (key && (!seen || key.seq >= seen.seq)) seen = key;
+  if (!fresh) {
+    // Drop a bubble whose action was just undone; keep it through unrelated updates like renames.
+    if (delta && !(la && la.seq === delta.seq && la.action.delta === delta.d)) { delta = null; clearTimeout(deltaTimer); }
+    return;
+  }
+  const a = la.action, d = Number(a.delta);
+  const [text, gain] = a.type === "life" ? [signed(d), d > 0]
+    : a.type === "cmd_damage" ? [`${signed(-d)}<small>cmd</small>`, d < 0]
+    : a.type === "poison" ? [`${signed(d)}<small>poison</small>`, d < 0]
+    : [`${signed(d)}<small>${esc(a.name)}</small>`, d > 0];
+  delta = {pid: a.target, text, gain, start: Date.now(), seq: la.seq, d: a.delta};
+  clearTimeout(deltaTimer);
+  deltaTimer = setTimeout(() => { delta = null; render(); }, DELTA_MS);
+}
+
+function deltaHtml() {
+  const age = Date.now() - delta.start;  // keeps the fade in step when tiles re-render
+  return `<div class="delta ${delta.gain ? "gain" : "loss"}" style="--ms:${DELTA_MS}ms;--age:-${age}ms">${delta.text}</div>`;
 }
 
 function render() {
   const main = $("tiles"), players = state.players;
+  if (delta && !players.some(p => p.id === delta.pid)) delta = null;
   const names = Object.fromEntries(players.map(p => [p.id, p.name]));
   if (!players.length) {
     main.style.gridTemplateColumns = "1fr";
@@ -560,7 +599,7 @@ function connect() {
     }
   };
   ws.onclose = () => {
-    stopHold();
+    endPress(false);
     if (gone) { show("msg"); $("loading").textContent = "This room has ended. Ask for a new link."; return; }
     $("status").hidden = false;
     setTimeout(connect, Math.min(1000 * 2 ** retry++, 8000));
@@ -636,36 +675,46 @@ function describe({actor, action: a}) {
   return a.type;
 }
 
-// ---- hold to repeat ---------------------------------------------------------------
-// The first action fires on press; holding repeats it until release.
+// ---- taps and holds ----------------------------------------------------------------
+// A tap acts on release, so a finger that lands on a button to scroll does nothing:
+// moving past MOVE_SLOP, or the browser cancelling the press as the page scrolls, drops it.
+// Holding still for HOLD_DELAY starts repeating instead.
 
-let hold = null;
-function startHold(btn) {
-  stopHold();
-  const msg = JSON.parse(btn.dataset.hold);
-  if (!act(msg)) return;
-  navigator.vibrate?.(8);
+const MOVE_SLOP = 10;  // px a finger can drift and still count as a tap
+let press = null;
+
+function startPress(btn, e) {
+  endPress(false);
+  press = {btn, id: e.pointerId, x: e.clientX, y: e.clientY, msg: JSON.parse(btn.dataset.hold), repeating: false};
   btn.classList.add("held");
-  hold = {btn, timer: setTimeout(() => {
-    hold.timer = setInterval(() => { if (!act(msg)) stopHold(); }, HOLD_EVERY);
-  }, HOLD_DELAY)};
+  press.timer = setTimeout(() => {
+    press.repeating = true;
+    if (!act(press.msg)) { endPress(false); return; }
+    navigator.vibrate?.(8);
+    press.timer = setInterval(() => { if (!act(press.msg)) endPress(false); }, HOLD_EVERY);
+  }, HOLD_DELAY);
 }
-function stopHold() {
-  if (!hold) return;
-  clearTimeout(hold.timer); clearInterval(hold.timer);
-  hold.btn.classList.remove("held");
-  hold = null;
+
+function endPress(isTap) {
+  if (!press) return;
+  const {btn, msg, repeating, timer} = press;
+  press = null;
+  clearTimeout(timer); clearInterval(timer);
+  btn.classList.remove("held");
+  if (isTap && !repeating && act(msg)) navigator.vibrate?.(8);
 }
+
 document.addEventListener("pointerdown", e => {
   const btn = e.target.closest("[data-hold]");
-  if (!btn || e.button !== 0) return;
-  e.preventDefault();
-  btn.setPointerCapture?.(e.pointerId);
-  startHold(btn);
+  if (btn && e.button === 0) startPress(btn, e);
 });
-for (const ev of ["pointerup", "pointercancel", "lostpointercapture"]) document.addEventListener(ev, stopHold);
+document.addEventListener("pointermove", e => {
+  if (press && e.pointerId === press.id && Math.hypot(e.clientX - press.x, e.clientY - press.y) > MOVE_SLOP) endPress(false);
+});
+document.addEventListener("pointerup", e => { if (press && e.pointerId === press.id) endPress(true); });
+document.addEventListener("pointercancel", () => endPress(false));
+document.addEventListener("visibilitychange", () => endPress(false));
 document.addEventListener("contextmenu", e => { if (e.target.closest("[data-hold]")) e.preventDefault(); });
-document.addEventListener("visibilitychange", stopHold);
 // Keyboard and screen readers: Enter/Space acts once.
 document.addEventListener("click", e => {
   const btn = e.target.closest("[data-hold]");

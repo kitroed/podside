@@ -42,7 +42,7 @@ HTTPS matters for more than security: browsers only let the display keep the scr
 ```
 
 - **The server is the only source of truth.** Clients never set values directly. They send *actions*, and the server validates them, applies them under a per-room `asyncio.Lock`, adds them to the undo log, and sends the full room state to every connection.
-- **Actions, not values.** If two people tap at the same moment, both changes count. Each action is saved as a list of reversible `Change` tuples `(player_id, field, key, delta)`, so undo just reverses them in order.
+- **Actions, not values.** If two people tap at the same moment, both changes count. Each action is saved as a list of reversible `Change` tuples `(player_id, field, key, delta)`, so undo just reverses them in order. Rapid repeats of the same action are grouped into one entry (see *Grouping rapid taps* below).
 - **Full state on every update.** State is small (8 players max), so the server sends a complete snapshot after each change and on connect. That keeps reconnects simple. Every snapshot carries a `seq` number.
 - **Reconnect by token.** Joining gives the player a token, which the client keeps in `localStorage`. Connecting with `?token=` gives the player their seat back.
 
@@ -97,11 +97,16 @@ Connect to `/ws/{code}?role=display` or `/ws/{code}?role=player[&token=...]`. Al
   "code": "WEVK", "seq": 12, "starting_life": 40, "table_edits": true,
   "players": [{"id": "p1", "name": "Kit", "life": 37, "poison": 0,
                "cmd_damage": {"p2": 3}, "counters": {}, "eliminated": false}],
-  "last_action": {"seq": 12, "actor": "p1", "action": {...}, "ts": 1732327748.6}
+  "last_action": {"seq": 12, "actor": "p1", "ts": 1732327748.6,
+                  "action": {"type": "life", "target": "p1", "delta": -3}}
 }}
 {"type": "error", "message": "..."}
 {"type": "pong"}
 ```
+
+`last_action` is the newest entry in the undo history, or `null`. Its `action` is the server's normalised copy, not the client's message: it always has the resolved `target`, an integer `delta` (after clamping), and `source` for `cmd_damage` or `name` for `counter`, and nothing else.
+
+**Grouping rapid taps.** When the same actor repeats the same action (same type, target, and source or counter name) within 400 ms of their previous one, the server folds it into that history entry instead of adding a new one. Every tap still applies and broadcasts straight away. The entry's `delta` becomes the running total and `ts` moves to the latest tap, so `seq` stays the same while `delta` changes. One undo reverses the whole group. A group that nets to zero is removed. After an undo, the entry it exposes is closed, so the next tap starts a new group.
 
 ## Code layout
 
@@ -125,7 +130,7 @@ Run the tests with `pip install pytest && pytest -q`.
 - [x] Real **display view**: large tiles, commander damage on each tile (colored by source), eliminated-player styling, the join link, and a Wake Lock so the TV doesn't sleep
 - [x] QR code to join on the display (hand-rolled encoder in `qr.py`, served as SVG)
 - [x] Real **player view**: big +/- buttons, hold to repeat, a commander damage picker, undo
-- [ ] Batch rapid taps for about 400 ms so the display shows "−5" instead of five −1s
+- [x] Batch rapid taps for about 400 ms so the display shows "−5" instead of five −1s
 - [ ] Static files in `static/` and templates in place of the inline HTML
 
 **Later**

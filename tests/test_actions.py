@@ -15,7 +15,7 @@ def test_life(table: Table) -> None:
     s = table.act(a, type="life", delta=-3)  # target defaults to self
     assert player(s, "p1")["life"] == 37
     assert s["last_action"]["actor"] == "p1"
-    assert s["last_action"]["action"] == {"type": "life", "delta": -3}
+    assert s["last_action"]["action"] == {"type": "life", "target": "p1", "delta": -3}
 
 
 def test_life_permission(table: Table) -> None:

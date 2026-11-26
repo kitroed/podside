@@ -37,6 +37,25 @@ def clean_name(name: Any) -> str:
     return str(name or "").strip()[:24]
 
 
+COLOR_ORDER = "WUBRG"  # white, blue, black, red, green; "C" is colorless
+
+
+def clean_colors(value: Any) -> str:
+    """Deck colors as letters in WUBRG order, "C" alone for colorless, or "" for unset."""
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise ActionError("Colors must be a string of letters, like \"WUG\"")
+    letters = set(value.upper().replace(" ", ""))
+    if not letters <= set(COLOR_ORDER + "C"):
+        raise ActionError("Colors must be letters from W, U, B, R, G, or C for colorless")
+    if "C" in letters:
+        if len(letters) > 1:
+            raise ActionError("Colorless can't be combined with other colors")
+        return "C"
+    return "".join(c for c in COLOR_ORDER if c in letters)
+
+
 # ---------------------------------------------------------------------------
 # Domain model
 # ---------------------------------------------------------------------------
@@ -51,6 +70,7 @@ class Player:
     poison: int = 0
     cmd_damage: dict[str, int] = field(default_factory=dict)  # source player id -> damage taken
     counters: dict[str, int] = field(default_factory=dict)  # energy, experience, etc.
+    colors: str = ""  # deck colors, see clean_colors()
 
     @property
     def eliminated(self) -> bool:
@@ -70,6 +90,7 @@ class Player:
             "cmd_damage": self.cmd_damage,
             "counters": self.counters,
             "eliminated": self.eliminated,
+            "colors": self.colors,
         }
 
 
@@ -128,12 +149,19 @@ class Room:
 
     # ---- players --------------------------------------------------------
 
-    def add_player(self, name: str) -> Player:
+    def add_player(self, name: str, colors: Any = None) -> Player:
         if len(self.players) >= MAX_PLAYERS:
             raise ActionError(f"Room is full ({MAX_PLAYERS} players max)")
+        deck_colors = clean_colors(colors)  # validate before taking a seat number
         pid = f"p{self._next_player_num}"
         self._next_player_num += 1
-        player = Player(id=pid, name=clean_name(name) or pid.upper(), token=secrets.token_urlsafe(16), life=self.starting_life)
+        player = Player(
+            id=pid,
+            name=clean_name(name) or pid.upper(),
+            token=secrets.token_urlsafe(16),
+            life=self.starting_life,
+            colors=deck_colors,
+        )
         self.players[pid] = player
         return player
 

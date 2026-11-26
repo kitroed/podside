@@ -111,10 +111,10 @@ class Table:
     def display(self) -> Conn:
         return self._open("display")
 
-    def player(self, name: str = "", *, join: bool = True) -> Conn:
+    def player(self, name: str = "", *, join: bool = True, colors: str | None = None) -> Conn:
         conn = self._open("player")
         if join:
-            conn.send(type="join", name=name)
+            conn.send(type="join", name=name, **({"colors": colors} if colors is not None else {}))
             conn.welcome()
             self._read_broadcast()
         return conn

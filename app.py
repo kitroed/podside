@@ -122,7 +122,7 @@ async def room_socket(
                         if role != "player":
                             raise ActionError("Only player connections can join")
                         if player is None:
-                            player = room.add_player(msg.get("name", ""))
+                            player = room.add_player(msg.get("name", ""), msg.get("colors"))
                         await send(ws, {"type": "welcome", "player_id": player.id, "token": player.token})
                     else:
                         if role == "player" and player is None:
@@ -148,6 +148,19 @@ async def room_socket(
 # One color per seat, shared by the display and player views.
 PLAYER_COLORS = ["#e5484d", "#3e9bff", "#30a46c", "#ffb224", "#a970ff", "#12b5b0", "#ff6bb5", "#c2c7d0"]
 
+# Deck color pips (W U B R G, C for colorless), shared by the display and player pages.
+PIP_CSS = """ .pips{display:inline-flex;gap:.16em;flex-shrink:0}
+ .pip{width:1.25em;height:1.25em;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+   font-size:.62em;font-weight:800;line-height:1;box-shadow:inset 0 0 0 .1em #0006}
+ .pip-W{background:#f3ecd0;color:#2a2520}.pip-U{background:#2f7fd0;color:#fff}
+ .pip-B{background:#1d1917;color:#eee;box-shadow:inset 0 0 0 .1em #a89f96}
+ .pip-R{background:#d94a3a;color:#fff}.pip-G{background:#2e9a5b;color:#fff}.pip-C{background:#b9b3ad;color:#2a2520}
+"""
+PIP_JS = """const COLOR_NAMES = {W: "White", U: "Blue", B: "Black", R: "Red", G: "Green", C: "Colorless"};
+const pips = c => !c ? "" : `<span class="pips" role="img" aria-label="${[...c].map(x => COLOR_NAMES[x]).join(", ")}">`
+  + [...c].map(x => `<span class="pip pip-${x}" aria-hidden="true">${x}</span>`).join("") + "</span>";
+"""
+
 INDEX_PAGE = """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MTG tracker</title><style>body{font-family:system-ui;margin:2rem;background:#111;color:#eee}a{color:#8cf}</style></head>
 <body><h1>MTG life tracker</h1><button onclick="go()">Create room</button><div id="out"></div>
@@ -170,7 +183,7 @@ DISPLAY_PAGE = """<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Room __CODE__ · MTG tracker</title>
 <style>
- :root{--bg:#0b0d10;--tile:#171a21;--fg:#f4f5f7;--dim:#9aa1ad;--warn:#ffb224;--lethal:#ff4d4f;--radius:1.6vh}
+__PIP_CSS__ :root{--bg:#0b0d10;--tile:#171a21;--fg:#f4f5f7;--dim:#9aa1ad;--warn:#ffb224;--lethal:#ff4d4f;--radius:1.6vh}
  *{box-sizing:border-box}
  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
@@ -198,7 +211,9 @@ DISPLAY_PAGE = """<!doctype html>
  .delta.loss{color:var(--lethal)}.delta.gain{color:#3dd68c}
  .delta small{font-size:.45em;font-weight:700;color:var(--dim);margin-left:.25em}
  @keyframes delta-fade{0%,75%{opacity:1}100%{opacity:0}}
- .name{font-size:min(13cqh,11cqw);font-weight:700;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .name{font-size:min(13cqh,11cqw);font-weight:700;max-width:100%;display:flex;align-items:center;gap:.3em}
+ .name .nm{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .tile.out .pips{opacity:.45}
  .life{font-size:min(48cqh,40cqw);font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
  .life.low{color:var(--warn)}
  .extras{display:flex;flex-wrap:wrap;justify-content:center;gap:2cqh 3cqw;font-size:min(9cqh,7.5cqw);min-height:1.2em}
@@ -264,7 +279,7 @@ DISPLAY_PAGE = """<!doctype html>
 const CODE = "__CODE__";
 const POISON_LETHAL = __POISON_LETHAL__, CMD_LETHAL = __CMD_LETHAL__;
 const COLORS = __COLORS__;
-const $ = id => document.getElementById(id);
+__PIP_JS__const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const colorOf = pid => COLORS[(parseInt(pid.slice(1), 10) - 1) % COLORS.length];
 const STARTING_LIFE_PRESETS = [20, 25, 30, 40];
@@ -324,7 +339,7 @@ function tile(p, names) {
   const out = p.eliminated, low = !out && p.life <= 10 ? "low" : "";
   const bottom = out ? `<span class="pill">${esc(outReason(p, names))}</span>` : extras.join("");
   return `<section class="tile ${out ? "out" : ""}" data-pid="${esc(p.id)}" style="--c:${colorOf(p.id)}">
-    <div class="name">${esc(p.name)}</div>
+    <div class="name"><span class="nm">${esc(p.name)}</span>${pips(p.colors)}</div>
     <div class="life ${low}">${out ? "OUT" : p.life}</div>
     <div class="extras">${bottom}</div>
     ${delta && delta.pid === p.id ? deltaHtml() : ""}
@@ -467,7 +482,7 @@ PLAYER_PAGE = """<!doctype html>
 <meta name="theme-color" content="#0b0d10">
 <title>Room __CODE__ · MTG tracker</title>
 <style>
- :root{--bg:#0b0d10;--card:#171a21;--btn:#262b36;--fg:#f4f5f7;--dim:#9aa1ad;--warn:#ffb224;--lethal:#ff4d4f;--c:#343a48}
+__PIP_CSS__ :root{--bg:#0b0d10;--card:#171a21;--btn:#262b36;--fg:#f4f5f7;--dim:#9aa1ad;--warn:#ffb224;--lethal:#ff4d4f;--c:#343a48}
  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
  body{min-height:100dvh;display:flex;flex-direction:column;padding:env(safe-area-inset-top) 0 0}
@@ -480,7 +495,19 @@ PLAYER_PAGE = """<!doctype html>
 
  header{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:4px solid var(--c)}
  .me{flex:1;min-width:0;min-height:48px;text-align:left;background:none;padding:0;font-size:22px;
-   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+   display:flex;align-items:center;gap:8px;white-space:nowrap}
+ .me .nm{min-width:0;overflow:hidden;text-overflow:ellipsis}
+ .picker{display:grid;grid-template-columns:repeat(6,minmax(48px,56px));gap:6px}
+ .picker .pip{width:100%;height:auto;aspect-ratio:1;font-size:20px;opacity:.3;padding:0}
+ .picker .pip[aria-pressed="true"]{opacity:1;outline:3px solid var(--fg);outline-offset:2px}
+ dialog{width:calc(100% - 32px);max-width:480px;background:#1b1f27;color:var(--fg);border:0;border-radius:16px;padding:20px}
+ dialog::backdrop{background:#000a}
+ dialog h2{margin:0;font-size:24px}
+ .fld{display:flex;flex-direction:column;gap:10px;margin:18px 0;font-size:16px;color:var(--dim);font-weight:600}
+ .fld input{height:56px;border-radius:12px;border:2px solid #343a48;background:var(--card);padding:0 14px;font-size:22px;color:var(--fg)}
+ .actions{display:flex;gap:12px;margin-top:22px}
+ .actions button{flex:1;height:56px;font-size:20px}
+ .actions .primary{background:#3e63dd}
  .me small{color:var(--dim);font-weight:500;font-size:16px}
  .room{color:var(--dim);font-size:16px;font-weight:600;letter-spacing:.15em}
  .status{font-size:14px;font-weight:700;padding:4px 10px;border-radius:99px;background:var(--warn);color:#000}
@@ -528,7 +555,7 @@ PLAYER_PAGE = """<!doctype html>
  .join p{margin:0;color:var(--dim);font-size:18px}
  .join input{height:64px;border-radius:14px;border:2px solid #343a48;background:var(--card);padding:0 16px;font-size:24px}
  .join input:focus{outline:none;border-color:#3e63dd}
- .join button{height:64px;font-size:24px;background:#3e63dd}
+ .join > button{height:64px;font-size:24px;background:#3e63dd}
  .msg{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:22px;color:var(--dim)}
 
  .toast{position:fixed;left:16px;right:16px;bottom:84px;background:#3a2a10;border:1px solid var(--warn);
@@ -547,6 +574,8 @@ PLAYER_PAGE = """<!doctype html>
   <h1>Join room __CODE__</h1>
   <p>Your name shows on the table display.</p>
   <input id="name" maxlength="24" autocomplete="nickname" placeholder="Your name" enterkeyhint="go">
+  <p>Deck colors (optional)</p>
+  <div class="picker" id="joinColors" role="group" aria-label="Deck colors"></div>
   <button type="submit">Join</button>
 </form>
 
@@ -578,6 +607,14 @@ PLAYER_PAGE = """<!doctype html>
 </main>
 
 <footer id="footer" hidden><button class="undo" id="undo" disabled>Nothing to undo</button></footer>
+<dialog id="edit">
+  <form id="editForm">
+    <h2>Name and deck</h2>
+    <label class="fld">Name<input id="editName" maxlength="24" autocomplete="nickname"></label>
+    <div class="fld">Deck colors<div class="picker" id="editColors" role="group" aria-label="Deck colors"></div></div>
+    <div class="actions"><button type="button" id="editCancel">Cancel</button><button type="submit" class="primary">Save</button></div>
+  </form>
+</dialog>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -585,7 +622,7 @@ PLAYER_PAGE = """<!doctype html>
 const CODE = "__CODE__";
 const POISON_LETHAL = __POISON_LETHAL__, CMD_LETHAL = __CMD_LETHAL__;
 const COLORS = __COLORS__;
-const TOKEN_KEY = "mtg-token-" + CODE;
+__PIP_JS__const TOKEN_KEY = "mtg-token-" + CODE;
 const HOLD_DELAY = 400, HOLD_EVERY = 120;  // ms before repeating, then between repeats
 
 const $ = id => document.getElementById(id);
@@ -654,7 +691,7 @@ function render() {
     return;
   }
   show("game");
-  $("me").innerHTML = `${esc(p.name)} <small>✎</small>`;
+  $("me").innerHTML = `<span class="nm">${esc(p.name)}</span>${pips(p.colors)}<small>✎</small>`;
   if (!state.table_edits) viewing = null;
   renderTabs();
 
@@ -800,14 +837,50 @@ $("join").onsubmit = e => {
   e.preventDefault();
   const name = $("name").value.trim();
   if (!name) { $("name").focus(); return; }
-  act({type: "join", name});
+  act({type: "join", name, colors: pickerValue($("joinColors"))});
 };
 $("undo").onclick = () => act({type: "undo"});
+// ---- name and deck colors ------------------------------------------------------------
+
+function makePicker(el) {
+  el.innerHTML = [..."WUBRGC"].map(c =>
+    `<button type="button" class="pip pip-${c}" data-c="${c}" aria-pressed="false" aria-label="${COLOR_NAMES[c]}">${c}</button>`).join("");
+  el.addEventListener("click", e => {
+    const b = e.target.closest("[data-c]");
+    if (!b) return;
+    const on = b.getAttribute("aria-pressed") !== "true";
+    // Colorless can't be combined with colors: picking one side clears the other.
+    if (on) for (const o of el.querySelectorAll("[data-c]")) {
+      if ((o.dataset.c === "C") !== (b.dataset.c === "C")) o.setAttribute("aria-pressed", "false");
+    }
+    b.setAttribute("aria-pressed", String(on));
+  });
+}
+const pickerValue = el => [...el.querySelectorAll('[aria-pressed="true"]')].map(b => b.dataset.c).join("");
+function setPicker(el, colors) {
+  for (const b of el.querySelectorAll("[data-c]")) b.setAttribute("aria-pressed", String(colors.includes(b.dataset.c)));
+}
+makePicker($("joinColors"));
+makePicker($("editColors"));
+
+const myPlayer = () => me && state && state.players.find(x => x.id === me);
 $("me").onclick = () => {
-  const p = me && state && state.players.find(x => x.id === me);
+  const p = myPlayer();
   if (!p) return;
-  const name = prompt("Your name", p.name);
-  if (name && name.trim() && name.trim() !== p.name) act({type: "rename", name: name.trim()});
+  $("editName").value = p.name;
+  setPicker($("editColors"), p.colors);
+  $("edit").showModal();
+};
+$("editCancel").onclick = () => $("edit").close();
+$("editForm").onsubmit = e => {
+  e.preventDefault();
+  const p = myPlayer();
+  if (p) {
+    const name = $("editName").value.trim(), colors = pickerValue($("editColors"));
+    if (name && name !== p.name) act({type: "rename", name});
+    if (colors !== p.colors) act({type: "colors", colors});
+  }
+  $("edit").close();
 };
 
 let toastTimer = null;
@@ -823,7 +896,9 @@ connect();
 
 def _render(page: str, code: str) -> str:
     return (
-        page.replace("__CODE__", code)
+        page.replace("__PIP_CSS__", PIP_CSS)
+        .replace("__PIP_JS__", PIP_JS)
+        .replace("__CODE__", code)
         .replace("__POISON_LETHAL__", str(POISON_LETHAL))
         .replace("__CMD_LETHAL__", str(COMMANDER_DAMAGE_LETHAL))
         .replace("__COLORS__", json.dumps(PLAYER_COLORS))

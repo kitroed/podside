@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from models import MAX_DELTA, ActionError, Player, Room, clean_name
+from models import MAX_DELTA, ActionError, Player, Room, clean_colors, clean_name
 
 
 def as_delta(value: Any) -> int:
@@ -75,6 +75,11 @@ def handle_action(room: Room, actor: Player | None, msg: dict[str, Any]) -> None
             raise ActionError("Name required")
         p.name = new_name
         room.seq += 1  # not undoable, but bump seq so clients refresh
+
+    elif kind == "colors":
+        p = target_player()
+        p.colors = clean_colors(msg.get("colors"))
+        room.seq += 1  # not undoable, like rename
 
     elif kind == "undo":
         room.undo()

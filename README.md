@@ -75,12 +75,13 @@ Connect to `/ws/{code}?role=display` or `/ws/{code}?role=player[&token=...]`. Al
 **Client → server**
 
 ```jsonc
-{"type": "join", "name": "Kit"}                                // player connections only
+{"type": "join", "name": "Kit", "colors": "WU"}                // player connections only; colors optional
 {"type": "life", "target": "p1", "delta": -3}
 {"type": "poison", "target": "p1", "delta": 1}
 {"type": "cmd_damage", "target": "p1", "source": "p2", "delta": 5}  // source may equal target (a stolen commander)
 {"type": "counter", "target": "p1", "name": "energy", "delta": 1}
 {"type": "rename", "target": "p1", "name": "Kit"}
+{"type": "colors", "target": "p1", "colors": "WUG"}           // deck colors; "" clears, not undoable
 {"type": "undo"}
 {"type": "reset"}                                              // new game, same players
 {"type": "settings", "starting_life": 40, "table_edits": true}
@@ -89,6 +90,8 @@ Connect to `/ws/{code}?role=display` or `/ws/{code}?role=player[&token=...]`. Al
 
 `target` defaults to the sender's own player when left out.
 
+**Deck colors** are letters from `WUBRG` (white, blue, black, red, green), or `C` alone for colorless. The server accepts them in any order and case and stores them in WUBRG order, so `"gw"` becomes `"WG"`. Unknown letters, or `C` mixed with colors, are rejected. Like `rename`, `colors` follows the edit permissions and isn't undoable.
+
 **Server → client**
 
 ```jsonc
@@ -96,7 +99,7 @@ Connect to `/ws/{code}?role=display` or `/ws/{code}?role=player[&token=...]`. Al
 {"type": "state", "state": {
   "code": "WEVK", "seq": 12, "starting_life": 40, "table_edits": true,
   "players": [{"id": "p1", "name": "Kit", "life": 37, "poison": 0,
-               "cmd_damage": {"p2": 3}, "counters": {}, "eliminated": false}],
+               "cmd_damage": {"p2": 3}, "counters": {}, "eliminated": false, "colors": "WU"}],
   "last_action": {"seq": 12, "actor": "p1", "ts": 1732327748.6,
                   "action": {"type": "life", "target": "p1", "delta": -3}}
 }}

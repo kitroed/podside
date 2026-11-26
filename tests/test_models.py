@@ -97,7 +97,7 @@ def test_snapshot_shape() -> None:
     room = Room(code="ABCD")
     room.add_player("Kit")
     snap = room.snapshot()
-    assert set(snap) == {"code", "seq", "starting_life", "table_edits", "players", "last_action"}
+    assert set(snap) == {"code", "seq", "starting_life", "table_edits", "players", "last_action", "departed"}
     assert snap["last_action"] is None
 
 

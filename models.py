@@ -100,6 +100,14 @@ Change = tuple[str, str, str | None, int]
 
 
 @dataclass
+class Removal:
+    """A removed player, kept whole so undo can put them back exactly."""
+
+    player: Player
+    seat: int  # position in the player order
+
+
+@dataclass
 class LogEntry:
     seq: int
     ts: float  # time of the latest action folded into this entry
@@ -107,6 +115,7 @@ class LogEntry:
     action: dict[str, Any]  # normalised action; "delta" is the group's total
     changes: list[Change]
     closed: bool = False  # set once an undo exposes this entry, so new taps start a fresh group
+    removal: Removal | None = None  # set for "remove" actions, which aren't expressible as Changes
 
     def can_absorb(self, actor: str, action: dict[str, Any], now: float) -> bool:
         def key(a: dict[str, Any]) -> dict[str, Any]:
@@ -145,6 +154,7 @@ class Room:
     last_activity: float = field(default_factory=time.time)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     clock: Callable[[], float] = field(default=time.time, repr=False)  # replaceable in tests
+    departed: dict[str, str] = field(default_factory=dict)  # removed player id -> name, for their old cmd damage
     _next_player_num: int = 1
 
     # ---- players --------------------------------------------------------
@@ -178,7 +188,13 @@ class Room:
             "table_edits": self.table_edits,
             "players": [p.public() for p in self.players.values()],
             "last_action": self._describe(self.history[-1]) if self.history else None,
+            "departed": self._departed_names(),
         }
+
+    def _departed_names(self) -> dict[str, str]:
+        """Names of removed players whose commander damage is still on someone's totals."""
+        sources = {src for p in self.players.values() for src in p.cmd_damage}
+        return {pid: name for pid, name in self.departed.items() if pid in sources}
 
     def _describe(self, entry: LogEntry) -> dict[str, Any]:
         return {"seq": entry.seq, "actor": entry.actor, "action": entry.action, "ts": entry.ts}
@@ -219,17 +235,44 @@ class Room:
         if len(self.history) > UNDO_DEPTH:
             self.history.pop(0)
 
+    def remove_player(self, actor: str, action: dict[str, Any], pid: str) -> None:
+        """Take a player out of the game. Their commander damage on others stays (it still counts),
+        and the whole player is logged so undo can restore their seat, totals and token."""
+        seat = list(self.players).index(pid)
+        player = self.players.pop(pid)
+        self.departed[pid] = player.name
+        self.seq += 1
+        self.history.append(LogEntry(self.seq, self.clock(), actor, action, [], removal=Removal(player, seat)))
+        if len(self.history) > UNDO_DEPTH:
+            self.history.pop(0)
+
+    def _restore(self, removal: Removal) -> None:
+        if len(self.players) >= MAX_PLAYERS:
+            raise ActionError(f"Can't bring {removal.player.name} back: the room is full")
+        seats = list(self.players.items())
+        seats.insert(min(removal.seat, len(seats)), (removal.player.id, removal.player))
+        self.players = dict(seats)
+        self.departed.pop(removal.player.id, None)
+
     def undo(self) -> LogEntry:
-        # Skip entries with no reversible changes (e.g. renames)
+        # Skip entries with nothing to reverse (e.g. renames)
         while self.history:
             entry = self.history.pop()
-            if entry.changes:
+            if entry.removal:
+                try:
+                    self._restore(entry.removal)
+                except ActionError:
+                    self.history.append(entry)  # leave history as it was
+                    raise
+            elif entry.changes:
                 for c in reversed(entry.changes):
                     self._apply_change(c, sign=-1)
-                self.seq += 1
-                if self.history:
-                    self.history[-1].closed = True
-                return entry
+            else:
+                continue
+            self.seq += 1
+            if self.history:
+                self.history[-1].closed = True
+            return entry
         raise ActionError("Nothing to undo")
 
     def reset_game(self) -> None:
@@ -239,4 +282,5 @@ class Room:
             p.cmd_damage.clear()
             p.counters.clear()
         self.history.clear()
+        self.departed.clear()
         self.seq += 1

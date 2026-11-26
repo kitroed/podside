@@ -121,7 +121,7 @@ async def room_socket(
                     if msg.get("type") == "join":
                         if role != "player":
                             raise ActionError("Only player connections can join")
-                        if player is None:
+                        if player is None or player.id not in room.players:  # new, or removed and rejoining
                             player = room.add_player(msg.get("name", ""), msg.get("colors"))
                         await send(ws, {"type": "welcome", "player_id": player.id, "token": player.token})
                     else:
@@ -329,6 +329,8 @@ __PIP_CSS__ :root{--bg:#0b0d10;--tile:#171a21;--fg:#f4f5f7;--dim:#9aa1ad;--warn:
  .btn{min-height:6.5vh;min-width:6.5vh;padding:0 2.4vh;border-radius:1vh;border:0;background:#2c3240;font-size:3vh;font-weight:600}
  .btn.primary{background:#3e63dd}.btn.danger{background:#a4282b}
  .btn[aria-pressed="true"]{background:#30a46c}
+ .removes{display:flex;flex-wrap:wrap;gap:1.2vh;margin:0 0 1.6vh}
+ .removes .btn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
  .val{min-width:3ch;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
 
  .toast{position:fixed;left:50%;bottom:3vh;transform:translateX(-50%);background:#2c3240;padding:1.6vh 3vh;
@@ -354,6 +356,8 @@ __PIP_CSS__ :root{--bg:#0b0d10;--tile:#171a21;--fg:#f4f5f7;--dim:#9aa1ad;--warn:
     <span class="val" id="startLife">40</span>
     <button class="btn" data-life="1" aria-label="Raise starting life">+</button></div>
   <div class="row"><span class="lbl">New game, same players</span><button class="btn danger" id="reset">New game</button></div>
+  <div class="row"><span class="lbl">Remove a player (undo brings them back)</span></div>
+  <div class="removes" id="removes"></div>
   <div class="row"><span class="lbl">Full screen</span><button class="btn" id="fs">Full screen</button>
     <button class="btn" id="close">Close</button></div>
 </dialog>
@@ -446,6 +450,7 @@ function trackDelta() {
     return;
   }
   const a = la.action, d = Number(a.delta);
+  if (!("delta" in a)) { delta = null; clearTimeout(deltaTimer); return; }  // e.g. a removal
   const [text, gain] = a.type === "life" ? [signed(d), d > 0]
     : a.type === "cmd_damage" ? [`${signed(-d)}<small>cmd</small>`, d < 0]
     : a.type === "poison" ? [`${signed(d)}<small>poison</small>`, d < 0]
@@ -463,7 +468,8 @@ function deltaHtml() {
 function render() {
   const main = $("tiles"), players = state.players;
   if (delta && !players.some(p => p.id === delta.pid)) delta = null;
-  const names = Object.fromEntries(players.map(p => [p.id, p.name]));
+  // Players who left keep their name on commander damage they dealt.
+  const names = {...state.departed, ...Object.fromEntries(players.map(p => [p.id, p.name]))};
   if (!players.length) {
     main.style.gridTemplateColumns = "1fr";
     main.innerHTML = `<div class="empty"><div class="big">Scan to join</div>
@@ -485,6 +491,7 @@ function render() {
   $("edits").setAttribute("aria-pressed", state.table_edits);
   $("edits").textContent = state.table_edits ? "On" : "Off";
   $("startLife").textContent = state.starting_life;
+  renderRemoves();
 }
 
 function bump(pid) {
@@ -523,6 +530,28 @@ for (const b of document.querySelectorAll("[data-life]")) {
     if (next) act({type: "settings", starting_life: next});
   };
 }
+// Two taps to remove: the first arms the button for 3 s.
+let removeArmed = null, removeTimer = null;
+function renderRemoves() {
+  $("removes").innerHTML = state.players.length ? state.players.map(p => {
+    const armed = removeArmed === p.id;
+    return `<button class="btn ${armed ? "danger" : ""}" data-remove="${esc(p.id)}">${armed ? "Tap again to remove " : ""}${esc(p.name)}</button>`;
+  }).join("") : `<span class="lbl">No players yet</span>`;
+}
+$("removes").onclick = e => {
+  const b = e.target.closest("[data-remove]");
+  if (!b) return;
+  clearTimeout(removeTimer);
+  if (removeArmed === b.dataset.remove) {
+    removeArmed = null;
+    act({type: "remove", target: b.dataset.remove});
+  } else {
+    removeArmed = b.dataset.remove;
+    removeTimer = setTimeout(() => { removeArmed = null; renderRemoves(); }, 3000);
+  }
+  renderRemoves();
+};
+
 $("reset").onclick = () => {
   const b = $("reset");
   if (resetArmed) {
@@ -616,6 +645,10 @@ __PIP_CSS__ :root{--bg:#0b0d10;--card:#171a21;--btn:#262b36;--fg:#f4f5f7;--dim:#
  .actions{display:flex;gap:12px;margin-top:22px}
  .actions button{flex:1;height:56px;font-size:20px}
  .actions .primary{background:#3e63dd}
+ .remove{width:100%;min-height:56px;background:none;border:2px solid #5a2a2d;color:#ff8a8c;font-size:18px;
+   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 12px}
+ .remove[data-armed]{background:#a4282b;border-color:#a4282b;color:#fff}
+ dialog .remove{margin-top:18px}
  .me small{color:var(--dim);font-weight:500;font-size:16px}
  .room{color:var(--dim);font-size:16px;font-weight:600;letter-spacing:.15em}
  .status{font-size:14px;font-weight:700;padding:4px 10px;border-radius:99px;background:var(--warn);color:#000}
@@ -681,7 +714,7 @@ __PIP_CSS__ :root{--bg:#0b0d10;--card:#171a21;--btn:#262b36;--fg:#f4f5f7;--dim:#
 
 <form class="join" id="join" hidden>
   <h1>Join room __CODE__</h1>
-  <p>Your name shows on the table display.</p>
+  <p id="joinNote">Your name shows on the table display.</p>
   <input id="name" maxlength="24" autocomplete="nickname" placeholder="Your name" enterkeyhint="go">
   <p>Deck colors (optional)</p>
   <div class="picker" id="joinColors" role="group" aria-label="Deck colors"></div>
@@ -713,6 +746,7 @@ __PIP_CSS__ :root{--bg:#0b0d10;--card:#171a21;--btn:#262b36;--fg:#f4f5f7;--dim:#
     <h2 id="cmdTitle">Commander damage taken</h2>
     <div id="cmd"></div>
   </section>
+  <button class="remove" id="removeOther" hidden></button>
 </main>
 
 <footer id="footer" hidden><button class="undo" id="undo" disabled>Nothing to undo</button></footer>
@@ -722,6 +756,7 @@ __PIP_CSS__ :root{--bg:#0b0d10;--card:#171a21;--btn:#262b36;--fg:#f4f5f7;--dim:#
     <label class="fld">Name<input id="editName" maxlength="24" autocomplete="nickname"></label>
     <div class="fld">Deck colors<div class="picker" id="editColors" role="group" aria-label="Deck colors"></div></div>
     <div class="actions"><button type="button" id="editCancel">Cancel</button><button type="submit" class="primary">Save</button></div>
+    <button type="button" class="remove" id="leave">Leave this game</button>
   </form>
 </dialog>
 <div class="toast" id="toast" hidden></div>
@@ -796,6 +831,8 @@ function render() {
   const p = me && state.players.find(x => x.id === me);
   if (!p) {
     $("me").textContent = "EDH Table";
+    $("joinNote").textContent = me ? "You were removed from this game. Join again to get a new seat."
+                                   : "Your name shows on the table display.";
     if ($("join").hidden) { show("join"); }
     return;
   }
@@ -817,6 +854,8 @@ function render() {
   $("poison").textContent = v.poison;
   $("poison").className = "val" + (v.poison >= POISON_LETHAL ? " lethal" : v.poison >= POISON_LETHAL - 3 ? " warn" : "");
   $("cmdTitle").textContent = mine ? "Commander damage taken" : `Commander damage ${v.name} took`;
+  $("removeOther").hidden = mine;
+  if (!$("removeOther").dataset.armed) $("removeOther").textContent = `Remove ${v.name} from the game`;
 
   // One row per commander that can hit them. Their own commander (rare: an opponent stole it)
   // is last and hidden behind a link until revealed or until it has damage.
@@ -874,6 +913,8 @@ $("who").onclick = e => {
   const tab = e.target.closest("[data-pid]");
   if (!tab) return;
   viewing = tab.dataset.pid === me ? null : tab.dataset.pid;
+  const rm = $("removeOther");  // disarm a pending "remove" meant for the previous player
+  if (rm.dataset.armed) { clearTimeout(Number(rm.dataset.armed)); delete rm.dataset.armed; }
   render();
 };
 
@@ -892,6 +933,7 @@ function describe({actor, action: a}) {
     return `${who} ${signed(d)} cmd damage from ${nameOf(a.source)}`;
   }
   if (a.type === "counter") return `${who} ${signed(d)} ${a.name}`;
+  if (a.type === "remove") return `removed ${a.name}`;
   return a.type;
 }
 
@@ -982,6 +1024,36 @@ $("me").onclick = () => {
   $("edit").showModal();
 };
 $("editCancel").onclick = () => $("edit").close();
+
+// Removing a player takes two taps: the first arms the button for 3 s.
+function twoTap(btn, armedText, run) {
+  if (btn.dataset.armed) {
+    clearTimeout(Number(btn.dataset.armed));
+    delete btn.dataset.armed;
+    run();
+    return;
+  }
+  btn.dataset.label = btn.textContent;
+  btn.textContent = armedText;
+  btn.dataset.armed = setTimeout(() => { delete btn.dataset.armed; btn.textContent = btn.dataset.label; }, 3000);
+}
+$("removeOther").onclick = () => {
+  const target = viewId(), v = state.players.find(x => x.id === target);
+  twoTap($("removeOther"), `Tap again to remove ${v.name}`, () => {
+    viewing = null;
+    act({type: "remove", target});
+    render();  // back to your own totals straight away
+  });
+};
+$("leave").onclick = () => twoTap($("leave"), "Tap again to leave", () => {
+  $("edit").close();
+  act({type: "remove"});
+});
+$("edit").addEventListener("close", () => {
+  const b = $("leave");
+  if (b.dataset.armed) { clearTimeout(Number(b.dataset.armed)); delete b.dataset.armed; }
+  b.textContent = "Leave this game";
+});
 $("editForm").onsubmit = e => {
   e.preventDefault();
   const p = myPlayer();

@@ -82,6 +82,7 @@ Connect to `/ws/{code}?role=display` or `/ws/{code}?role=player[&token=...]`. Al
 {"type": "counter", "target": "p1", "name": "energy", "delta": 1}
 {"type": "rename", "target": "p1", "name": "Kit"}
 {"type": "colors", "target": "p1", "colors": "WUG"}           // deck colors; "" clears, not undoable
+{"type": "remove", "target": "p3"}                             // take a player out; undoable
 {"type": "undo"}
 {"type": "reset"}                                              // new game, same players
 {"type": "settings", "starting_life": 40, "table_edits": true}
@@ -101,13 +102,16 @@ Connect to `/ws/{code}?role=display` or `/ws/{code}?role=player[&token=...]`. Al
   "players": [{"id": "p1", "name": "Kit", "life": 37, "poison": 0,
                "cmd_damage": {"p2": 3}, "counters": {}, "eliminated": false, "colors": "WU"}],
   "last_action": {"seq": 12, "actor": "p1", "ts": 1732327748.6,
-                  "action": {"type": "life", "target": "p1", "delta": -3}}
+                  "action": {"type": "life", "target": "p1", "delta": -3}},
+  "departed": {"p3": "Sam"}
 }}
 {"type": "error", "message": "..."}
 {"type": "pong"}
 ```
 
-`last_action` is the newest entry in the undo history, or `null`. Its `action` is the server's normalised copy, not the client's message: it always has the resolved `target`, an integer `delta` (after clamping), and `source` for `cmd_damage` or `name` for `counter`, and nothing else.
+`last_action` is the newest entry in the undo history, or `null`. Its `action` is the server's normalised copy, not the client's message: it always has the resolved `target`, an integer `delta` (after clamping), and `source` for `cmd_damage` or `name` for `counter`, and nothing else. A `remove` has `target` and the removed player's `name` instead of a `delta`.
+
+**Removing players.** `remove` follows the edit permissions: the display can remove anyone, a player can always remove themselves, and others only with `table_edits` on. The player's seat, totals and token are kept in the undo history, so `undo` restores them in the same seat and their open phone carries on. Undo is refused while the room is full. Commander damage a removed player dealt stays on the others (it still counts toward 21), and `departed` maps their id to their name for as long as any of it remains. A removed phone's next `join` gets a new seat.
 
 **Grouping rapid taps.** When the same actor repeats the same action (same type, target, and source or counter name) within 400 ms of their previous one, the server folds it into that history entry instead of adding a new one. Every tap still applies and broadcasts straight away. The entry's `delta` becomes the running total and `ts` moves to the latest tap, so `seq` stays the same while `delta` changes. One undo reverses the whole group. A group that nets to zero is removed. After an undo, the entry it exposes is closed, so the next tap starts a new group.
 
@@ -142,12 +146,13 @@ Run the tests with `pip install pytest && pytest -q`.
 - [ ] Turn tracking and an optional turn timer
 - [ ] Monarch, initiative, day/night, and other table-wide markers
 - [ ] Partner commanders (two damage sources per player)
-- [ ] Player kick and seat reordering from the display
+- [x] Remove players (TV settings, the player themselves, or anyone with table edits on); undoable
+- [ ] Seat reordering from the display
 - [x] Dockerfile for the home server; a reverse proxy needs WebSocket upgrade headers
 
 ## Constraints and conventions
 
 - Python 3.11+, FastAPI, with no build step for the front end (vanilla JS, or htmx/Alpine if needed)
 - Single process, in-memory state. Don't add Redis unless it's ever run as more than one instance
-- Every state change goes through `handle_action()` → `Room.commit()` so undo and history stay correct
+- Every state change goes through `handle_action()` → `Room.commit()` so undo and history stay correct. The exception is removing a player, which can't be expressed as `Change` tuples: `Room.remove_player()` logs the whole player instead, and `undo` puts them back
 - Never send player tokens in broadcast state (`Player.public()` leaves them out)

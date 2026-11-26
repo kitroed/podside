@@ -5,5 +5,5 @@ services:
     container_name: podside
     build: .
     ports:
-      - "8086:8000"  # host port 8000 is taken on starstorm (ArchiveBox)
+      - "8086:8000"  # host port: pick any free one; the reverse proxy forwards here
     restart: unless-stopped

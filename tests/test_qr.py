@@ -86,7 +86,7 @@ def test_smallest_version_is_chosen(text: str, version: int) -> None:
     assert len(m) == version * 4 + 17 and all(len(row) == len(m) for row in m)
 
 
-@pytest.mark.parametrize("text", ["a", "https://edh.oktired.com/play/ABCD", "x" * 150])
+@pytest.mark.parametrize("text", ["a", "https://podside.example.com/play/ABCD", "x" * 150])
 def test_function_patterns(text: str) -> None:
     m = qr.encode(text)
     size = len(m)
@@ -101,7 +101,7 @@ def test_function_patterns(text: str) -> None:
 
 @pytest.mark.parametrize(
     "text",
-    ["a", "MTG", "https://edh.oktired.com/play/ABCD", "http://192.168.0.101:8086/play/WXYZ", "Ünïcødé 🃏", "z" * 42],
+    ["a", "MTG", "https://podside.example.com/play/ABCD", "http://192.168.1.50:8086/play/WXYZ", "Ünïcødé 🃏", "z" * 42],
 )
 def test_round_trip_small_versions(text: str) -> None:
     assert decode_single_block(qr.encode(text)) == text
@@ -109,9 +109,9 @@ def test_round_trip_small_versions(text: str) -> None:
 
 def test_join_link_matches_verified_output() -> None:
     # Pinned from output that zxing-cpp decoded correctly; fails if encoding changes.
-    m = qr.encode("https://mtg.oktired.com/play/ABCD")
+    m = qr.encode("https://podside.example.com/play/ABCD")
     digest = hashlib.sha256("".join("1" if c else "0" for row in m for c in row).encode()).hexdigest()
-    assert digest == "27ff293bd8a40964f97675be56f5a5fafd85d778b4a3c4c54b2ea435c84d3f19"
+    assert digest == "3de33695364f92a21961b1bf0ba37e934f6c024b5e33146f7776b6b43857b537"
 
 
 def test_too_long() -> None:
@@ -128,10 +128,10 @@ def test_svg() -> None:
 
 
 def test_room_qr_endpoint(client: TestClient, room_code: str) -> None:
-    r = client.get(f"/api/rooms/{room_code.lower()}/qr.svg", params={"base": "https://edh.oktired.com"})
+    r = client.get(f"/api/rooms/{room_code.lower()}/qr.svg", params={"base": "https://podside.example.com"})
     assert r.status_code == 200
     assert r.headers["content-type"] == "image/svg+xml"
-    assert r.text == qr.svg(f"https://edh.oktired.com/play/{room_code}")
+    assert r.text == qr.svg(f"https://podside.example.com/play/{room_code}")
 
 
 def test_room_qr_unknown_room(client: TestClient) -> None:

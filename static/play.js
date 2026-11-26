@@ -71,6 +71,7 @@ function render() {
     $("me").textContent = "Podside";
     $("joinNote").textContent = me ? "You were removed from this game. Join again to get a new seat."
                                    : "Your name shows on the table display.";
+    renderSeatPick();
     if ($("join").hidden) { show("join"); }
     return;
   }
@@ -236,6 +237,20 @@ document.addEventListener("click", e => {
 });
 
 // ---- other controls ------------------------------------------------------------
+
+// Seats restored from a save that nobody has claimed yet.
+function renderSeatPick() {
+  const free = state.players.filter(x => !x.claimed);
+  $("seatPick").hidden = !free.length;
+  $("seatList").innerHTML = free.map(x => `<button type="button" data-seat="${esc(x.id)}" style="--tc:${colorOf(x.id)}">
+    <span>${esc(x.name)}</span>${pips(x.colors)}</button>`).join("");
+}
+$("seatList").onclick = e => {
+  const b = e.target.closest("[data-seat]");
+  if (b) act({type: "join", seat: b.dataset.seat});
+};
+saveLink($("save"));
+$("save").onclick = () => saveLink($("save"));  // refresh the time in the file name
 
 $("join").onsubmit = e => {
   e.preventDefault();

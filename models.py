@@ -65,7 +65,7 @@ def clean_colors(value: Any) -> str:
 class Player:
     id: str
     name: str
-    token: str
+    token: str | None  # None for a seat restored from a save that nobody has claimed yet
     life: int
     poison: int = 0
     cmd_damage: dict[str, int] = field(default_factory=dict)  # source player id -> damage taken
@@ -91,6 +91,7 @@ class Player:
             "counters": self.counters,
             "eliminated": self.eliminated,
             "colors": self.colors,
+            "claimed": self.token is not None,
         }
 
 
@@ -176,7 +177,18 @@ class Room:
         return player
 
     def player_by_token(self, token: str) -> Player | None:
-        return next((p for p in self.players.values() if secrets.compare_digest(p.token, token)), None)
+        return next((p for p in self.players.values() if p.token and secrets.compare_digest(p.token, token)), None)
+
+    def claim_seat(self, pid: Any) -> Player:
+        """Give an unclaimed seat (from a resumed save) to the phone that asks for it."""
+        player = self.players.get(str(pid))
+        if player is None:
+            raise ActionError("That seat isn't in this game any more")
+        if player.token is not None:
+            raise ActionError(f"Someone has already taken {player.name}'s seat")
+        player.token = secrets.token_urlsafe(16)
+        self.seq += 1
+        return player
 
     # ---- state ------------------------------------------------------------
 
@@ -188,10 +200,10 @@ class Room:
             "table_edits": self.table_edits,
             "players": [p.public() for p in self.players.values()],
             "last_action": self._describe(self.history[-1]) if self.history else None,
-            "departed": self._departed_names(),
+            "departed": self.departed_names(),
         }
 
-    def _departed_names(self) -> dict[str, str]:
+    def departed_names(self) -> dict[str, str]:
         """Names of removed players whose commander damage is still on someone's totals."""
         sources = {src for p in self.players.values() for src in p.cmd_damage}
         return {pid: name for pid, name in self.departed.items() if pid in sources}

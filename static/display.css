@@ -40,6 +40,8 @@
  .pill.lethal{background:var(--lethal);color:#000}.pill.lethal .k{color:#000}
 
  .tile.out{background:#111318;border-top-color:#3a3f4a}
+ .tile.unclaimed{opacity:.5}
+ a.btn{display:inline-flex;align-items:center;color:inherit;text-decoration:none}
  .tile.out .name{color:var(--dim)}
  .tile.out .life{color:var(--lethal);letter-spacing:.06em}
  .tile.out .pill{background:#2a1416;color:var(--fg)}

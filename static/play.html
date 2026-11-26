@@ -19,6 +19,11 @@
 
 <form class="join" id="join" hidden>
   <h1>Join room <span id="joinCode"></span></h1>
+  <div class="seatpick" id="seatPick" hidden>
+    <p>Back from a saved game? Tap your seat.</p>
+    <div id="seatList"></div>
+    <p>Or join as someone new:</p>
+  </div>
   <p id="joinNote">Your name shows on the table display.</p>
   <input id="name" maxlength="24" autocomplete="nickname" placeholder="Your name" enterkeyhint="go">
   <p>Deck colors (optional)</p>
@@ -61,13 +66,14 @@
     <label class="fld">Name<input id="editName" maxlength="24" autocomplete="nickname"></label>
     <div class="fld">Deck colors<div class="picker" id="editColors" role="group" aria-label="Deck colors"></div></div>
     <div class="actions"><button type="button" id="editCancel">Cancel</button><button type="submit" class="primary">Save</button></div>
+    <a class="savegame" id="save" download>Save this game to a file</a>
     <button type="button" class="remove" id="leave">Leave this game</button>
   </form>
 </dialog>
 <div class="toast" id="toast" hidden></div>
 
 <script src="/config.js"></script>
-<script src="/pips.js"></script>
+<script src="/shared.js"></script>
 <script src="/play.js"></script>
 
 </body></html>

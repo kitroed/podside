@@ -24,6 +24,7 @@
     <button class="btn" data-life="-1" aria-label="Lower starting life">−</button>
     <span class="val" id="startLife">40</span>
     <button class="btn" data-life="1" aria-label="Raise starting life">+</button></div>
+  <div class="row"><span class="lbl">Save this game to a file, to resume later</span><a class="btn" id="save" download>Save</a></div>
   <div class="row"><span class="lbl">New game, same players</span><button class="btn danger" id="reset">New game</button></div>
   <div class="row"><span class="lbl">Players: ▲▼ to match where people sit</span></div>
   <div class="seats" id="seats"></div>
@@ -32,7 +33,7 @@
 <div class="toast" id="toast" hidden></div>
 
 <script src="/config.js"></script>
-<script src="/pips.js"></script>
+<script src="/shared.js"></script>
 <script src="/display.js"></script>
 
 </body></html>

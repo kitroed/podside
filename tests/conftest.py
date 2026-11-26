@@ -119,6 +119,14 @@ class Table:
             self._read_broadcast()
         return conn
 
+    def claim(self, seat: str) -> Conn:
+        """A phone taking an unclaimed seat in a resumed game."""
+        conn = self._open("player")
+        conn.send(type="join", seat=seat)
+        conn.welcome()
+        self._read_broadcast()
+        return conn
+
     def reconnect(self, token: str) -> Conn:
         return self._open("player", token=token)
 

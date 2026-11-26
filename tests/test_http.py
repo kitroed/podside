@@ -43,7 +43,7 @@ def test_view_pages(client: TestClient, room_code: str, path: str) -> None:
     assert f'<script src="/{path}.js"></script>' in r.text
 
 
-@pytest.mark.parametrize("asset", ["pips.css", "pips.js", "index.css", "index.js", "display.css", "display.js", "play.css", "play.js"])
+@pytest.mark.parametrize("asset", ["pips.css", "shared.js", "index.css", "index.js", "display.css", "display.js", "play.css", "play.js"])
 def test_page_assets_are_served(client: TestClient, asset: str) -> None:
     assert client.get(f"/{asset}").status_code == 200
 

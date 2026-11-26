@@ -12,9 +12,10 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 import qr
+import saves
 
 from actions import handle_action
 from models import COMMANDER_DAMAGE_LETHAL, DEFAULT_STARTING_LIFE, POISON_LETHAL, ActionError, Player, Room
@@ -76,6 +77,33 @@ async def get_room(code: str) -> dict[str, Any]:
     return room.snapshot()
 
 
+@app.get("/api/rooms/{code}/save")
+async def save_room(code: str) -> JSONResponse:
+    room = manager.get(code)
+    if room is None:
+        raise HTTPException(404, "Room not found")
+    # No filename here: the page's download link names the file with the player's local time.
+    return JSONResponse(saves.dump(room), headers={"Content-Disposition": "attachment"})
+
+
+@app.post("/api/rooms/resume")
+async def resume_room(request: Request) -> dict[str, Any]:
+    """Start a new room from an uploaded save file (the file's JSON is the request body)."""
+    raw = b""
+    async for chunk in request.stream():
+        raw += chunk
+        if len(raw) > saves.MAX_SAVE_BYTES:
+            break  # parse() rejects it; no need to read the rest
+    try:
+        save = saves.parse(raw)
+    except ActionError as e:
+        raise HTTPException(400, str(e)) from None
+    room = manager.create(starting_life=save.starting_life)
+    saves.restore(room, save)
+    log.info("Room %s: resumed from a save with %d players", room.code, len(room.players))
+    return {"code": room.code, "display_url": f"/display/{room.code}", "play_url": f"/play/{room.code}"}
+
+
 @app.websocket("/ws/{code}")
 async def room_socket(
     ws: WebSocket,
@@ -124,7 +152,10 @@ async def room_socket(
                         if role != "player":
                             raise ActionError("Only player connections can join")
                         if player is None or player.id not in room.players:  # new, or removed and rejoining
-                            player = room.add_player(msg.get("name", ""), msg.get("colors"))
+                            if msg.get("seat") is not None:  # an unclaimed seat from a resumed save
+                                player = room.claim_seat(msg["seat"])
+                            else:
+                                player = room.add_player(msg.get("name", ""), msg.get("colors"))
                         await send(ws, {"type": "welcome", "player_id": player.id, "token": player.token})
                     else:
                         if role == "player" and player is None:

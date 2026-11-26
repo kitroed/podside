@@ -79,6 +79,12 @@
  .join input{height:64px;border-radius:14px;border:2px solid #343a48;background:var(--card);padding:0 16px;font-size:24px}
  .join input:focus{outline:none;border-color:#3e63dd}
  .join > button{height:64px;font-size:24px;background:#3e63dd}
+ .seatpick{display:flex;flex-direction:column;gap:12px}
+ #seatList{display:flex;flex-direction:column;gap:10px}
+ #seatList button{min-height:64px;font-size:22px;display:flex;align-items:center;justify-content:center;gap:10px;
+   background:var(--card);border:2px solid var(--tc)}
+ .savegame{display:flex;align-items:center;justify-content:center;min-height:56px;margin-top:18px;border-radius:12px;
+   background:#2c3240;color:var(--fg);font-size:18px;text-decoration:none}
  .msg{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:22px;color:var(--dim)}
 
  .toast{position:fixed;left:16px;right:16px;bottom:84px;background:#3a2a10;border:1px solid var(--warn);

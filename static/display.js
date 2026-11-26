@@ -62,7 +62,7 @@ function tile(p, names) {
   }
   const out = p.eliminated, low = !out && p.life <= 10 ? "low" : "";
   const bottom = out ? `<span class="pill">${esc(outReason(p, names))}</span>` : extras.join("");
-  return `<section class="tile ${out ? "out" : ""}" data-pid="${esc(p.id)}" style="--c:${colorOf(p.id)}">
+  return `<section class="tile ${out ? "out" : ""} ${p.claimed ? "" : "unclaimed"}" data-pid="${esc(p.id)}" style="--c:${colorOf(p.id)}">
     <div class="name">${esc(p.name)}</div>
     ${pips(p.colors)}
     <div class="life ${low}">${out ? "OUT" : p.life}</div>
@@ -156,6 +156,8 @@ function toast(msg, ms = 4000) {
 $("gear").onclick = () => $("panel").showModal();
 $("close").onclick = () => $("panel").close();
 document.querySelector('[data-act="undo"]').onclick = () => act({type: "undo"});
+saveLink($("save"));
+$("save").onclick = () => saveLink($("save"));  // refresh the time in the file name
 $("edits").onclick = () => act({type: "settings", table_edits: !state.table_edits});
 for (const b of document.querySelectorAll("[data-life]")) {
   b.onclick = () => {

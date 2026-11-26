@@ -153,7 +153,7 @@ Nothing here is promised. These are possibilities, roughly in order of interest.
 
 ## Constraints and conventions
 
-- Python 3.11+, FastAPI, with no build step for the front end (vanilla JS, or htmx/Alpine if needed)
+- Python 3.11+, FastAPI, with no build step for the front end (vanilla JS)
 - One server process holds every room in memory; any number of games can run at once. Shared storage such as Redis would only be needed to run more than one process
 - Every state change goes through `handle_action()` → `Room.commit()` so undo and history stay correct. The exception is removing a player, which can't be expressed as `Change` tuples: `Room.remove_player()` logs the whole player instead, and `undo` puts them back
 - Never send player tokens in broadcast state (`Player.public()` leaves them out)

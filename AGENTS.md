@@ -17,7 +17,7 @@ Run `pytest` before saying a task is done. If there are no tests yet, add them f
 ## Stack
 
 - Python 3.11+ and FastAPI, run with uvicorn. One process with in-memory state.
-- Front end: plain HTML, CSS and vanilla JS served by FastAPI. **No build step, bundler or npm.** htmx or Alpine from a CDN is allowed if it clearly simplifies a view.
+- Front end: plain HTML, CSS and vanilla JS served by FastAPI. **No build step, bundler or npm.**
 - Don't add new dependencies (Redis, an ORM, a front-end framework) without asking first.
 
 ## Architecture rules (don't break these)

@@ -497,6 +497,8 @@ __PIP_CSS__ :root{--bg:#0b0d10;--card:#171a21;--btn:#262b36;--fg:#f4f5f7;--dim:#
  .me{flex:1;min-width:0;min-height:48px;text-align:left;background:none;padding:0;font-size:22px;
    display:flex;align-items:center;gap:8px;white-space:nowrap}
  .me .nm{min-width:0;overflow:hidden;text-overflow:ellipsis}
+ .fs{width:48px;height:48px;flex-shrink:0;margin-right:-10px;padding:0;background:none;color:var(--dim);
+   display:flex;align-items:center;justify-content:center}
  .picker{display:grid;grid-template-columns:repeat(6,minmax(48px,56px));gap:6px}
  .picker .pip{width:100%;height:auto;aspect-ratio:1;font-size:20px;opacity:.3;padding:0}
  .picker .pip[aria-pressed="true"]{opacity:1;outline:3px solid var(--fg);outline-offset:2px}
@@ -563,9 +565,10 @@ __PIP_CSS__ :root{--bg:#0b0d10;--card:#171a21;--btn:#262b36;--fg:#f4f5f7;--dim:#
 </style></head>
 <body>
 <header>
-  <button class="me" id="me" aria-label="Rename">MTG tracker</button>
+  <button class="me" id="me" aria-label="Edit name and deck colors">MTG tracker</button>
   <span class="status" id="status" hidden>reconnecting…</span>
   <span class="room">__CODE__</span>
+  <button class="fs" id="fs" aria-label="Full screen" aria-pressed="false" hidden></button>
 </header>
 
 <div class="msg" id="loading">Connecting…</div>
@@ -691,6 +694,7 @@ function render() {
     return;
   }
   show("game");
+  keepAwake();
   $("me").innerHTML = `<span class="nm">${esc(p.name)}</span>${pips(p.colors)}<small>✎</small>`;
   if (!state.table_edits) viewing = null;
   renderTabs();
@@ -882,6 +886,43 @@ $("editForm").onsubmit = e => {
   }
   $("edit").close();
 };
+
+// ---- screen: stay awake during the game, optional full screen ---------------------------------
+
+// Phones dim and lock after a short idle time; a wake lock keeps the screen on while this page is
+// visible. Browsers drop it when the page is hidden, so it's requested again on return and on taps.
+let wakeLock = null, wakePending = false;
+async function keepAwake() {
+  if (!("wakeLock" in navigator) || document.visibilityState !== "visible") return;
+  if (wakePending || (wakeLock && !wakeLock.released)) return;
+  wakePending = true;
+  try { wakeLock = await navigator.wakeLock.request("screen"); } catch {} finally { wakePending = false; }
+}
+document.addEventListener("visibilitychange", () => { if (me) keepAwake(); });
+document.addEventListener("pointerdown", () => { if (me) keepAwake(); });
+
+// Full screen works on Android and iPad; iPhones only allow it for video, so the button stays hidden there.
+const FS_ENTER = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
+const FS_EXIT = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>';
+const root = document.documentElement;
+const inFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+function syncFullscreenButton() {
+  const on = inFullscreen();
+  $("fs").innerHTML = on ? FS_EXIT : FS_ENTER;
+  $("fs").setAttribute("aria-pressed", String(on));
+  $("fs").setAttribute("aria-label", on ? "Exit full screen" : "Full screen");
+}
+$("fs").hidden = !(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+$("fs").onclick = () => {
+  if (inFullscreen()) {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    return;
+  }
+  const request = root.requestFullscreen || root.webkitRequestFullscreen;
+  Promise.resolve(request.call(root)).catch(() => toast("Full screen isn't available here"));
+};
+for (const ev of ["fullscreenchange", "webkitfullscreenchange"]) document.addEventListener(ev, syncFullscreenButton);
+syncFullscreenButton();
 
 let toastTimer = null;
 function toast(msg) {

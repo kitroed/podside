@@ -321,16 +321,23 @@ __PIP_CSS__ :root{--bg:#0b0d10;--tile:#171a21;--fg:#f4f5f7;--dim:#9aa1ad;--warn:
  .gear{position:fixed;right:2vh;bottom:2vh;width:7vh;height:7vh;border-radius:50%;border:0;
    background:#ffffff14;font-size:3.6vh;opacity:.35}
  .gear:hover,.gear:focus-visible{opacity:1}
- dialog{background:#1b1f27;color:var(--fg);border:0;border-radius:var(--radius);padding:3vh;min-width:min(60vh,90vw)}
+ dialog{background:#1b1f27;color:var(--fg);border:0;border-radius:var(--radius);padding:3vh;min-width:min(60vh,90vw);
+   max-height:94vh;overflow-y:auto}
  dialog::backdrop{background:#000a}
  dialog h2{margin:0 0 2vh;font-size:4vh}
+ .panel-head{margin-top:0}.panel-head h2{flex:1;margin:0}
  .row{display:flex;align-items:center;gap:1.6vh;margin:1.6vh 0;font-size:3vh}
  .row .lbl{flex:1}
  .btn{min-height:6.5vh;min-width:6.5vh;padding:0 2.4vh;border-radius:1vh;border:0;background:#2c3240;font-size:3vh;font-weight:600}
  .btn.primary{background:#3e63dd}.btn.danger{background:#a4282b}
  .btn[aria-pressed="true"]{background:#30a46c}
- .removes{display:flex;flex-wrap:wrap;gap:1.2vh;margin:0 0 1.6vh}
- .removes .btn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .seats{display:flex;flex-direction:column;gap:.8vh;margin:0 0 1.6vh}
+ .seat{display:flex;align-items:center;gap:1.2vh;font-size:3vh}
+ .seat .nm{flex:1;min-width:0;display:flex;align-items:center;gap:1.2vh;white-space:nowrap}
+ .seat .nm span:last-child{overflow:hidden;text-overflow:ellipsis}
+ .seat .dot{width:1.8vh;height:1.8vh;border-radius:50%;background:var(--c);flex-shrink:0}
+ .seat .btn{min-height:5.6vh;min-width:5.6vh;padding:0 1.8vh;font-size:2.6vh}
+ .seat .btn:disabled{opacity:.25;cursor:default}
  .val{min-width:3ch;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
 
  .toast{position:fixed;left:50%;bottom:3vh;transform:translateX(-50%);background:#2c3240;padding:1.6vh 3vh;
@@ -348,7 +355,7 @@ __PIP_CSS__ :root{--bg:#0b0d10;--tile:#171a21;--fg:#f4f5f7;--dim:#9aa1ad;--warn:
 
 <button class="gear" id="gear" aria-label="Table settings">⚙</button>
 <dialog id="panel">
-  <h2>Table</h2>
+  <div class="row panel-head"><h2>Table</h2><button class="btn" id="close">Close</button></div>
   <div class="row"><span class="lbl">Undo last change</span><button class="btn primary" data-act="undo">Undo</button></div>
   <div class="row"><span class="lbl">Anyone can edit anyone</span><button class="btn" id="edits" aria-pressed="false">Off</button></div>
   <div class="row"><span class="lbl">Starting life</span>
@@ -356,10 +363,9 @@ __PIP_CSS__ :root{--bg:#0b0d10;--tile:#171a21;--fg:#f4f5f7;--dim:#9aa1ad;--warn:
     <span class="val" id="startLife">40</span>
     <button class="btn" data-life="1" aria-label="Raise starting life">+</button></div>
   <div class="row"><span class="lbl">New game, same players</span><button class="btn danger" id="reset">New game</button></div>
-  <div class="row"><span class="lbl">Remove a player (undo brings them back)</span></div>
-  <div class="removes" id="removes"></div>
-  <div class="row"><span class="lbl">Full screen</span><button class="btn" id="fs">Full screen</button>
-    <button class="btn" id="close">Close</button></div>
+  <div class="row"><span class="lbl">Players: ▲▼ to match where people sit</span></div>
+  <div class="seats" id="seats"></div>
+  <div class="row"><span class="lbl">Full screen</span><button class="btn" id="fs">Full screen</button></div>
 </dialog>
 <div class="toast" id="toast" hidden></div>
 
@@ -491,7 +497,7 @@ function render() {
   $("edits").setAttribute("aria-pressed", state.table_edits);
   $("edits").textContent = state.table_edits ? "On" : "Off";
   $("startLife").textContent = state.starting_life;
-  renderRemoves();
+  renderSeats();
 }
 
 function bump(pid) {
@@ -530,15 +536,29 @@ for (const b of document.querySelectorAll("[data-life]")) {
     if (next) act({type: "settings", starting_life: next});
   };
 }
-// Two taps to remove: the first arms the button for 3 s.
+// Players: ▲▼ match the TV to where people sit; Remove takes two taps (the first arms it for 3 s).
 let removeArmed = null, removeTimer = null;
-function renderRemoves() {
-  $("removes").innerHTML = state.players.length ? state.players.map(p => {
-    const armed = removeArmed === p.id;
-    return `<button class="btn ${armed ? "danger" : ""}" data-remove="${esc(p.id)}">${armed ? "Tap again to remove " : ""}${esc(p.name)}</button>`;
+function renderSeats() {
+  const ps = state.players;
+  $("seats").innerHTML = ps.length ? ps.map((p, i) => {
+    const armed = removeArmed === p.id, name = esc(p.name);
+    return `<div class="seat" style="--c:${colorOf(p.id)}">
+      <span class="nm"><span class="dot"></span><span>${name}</span></span>
+      <button class="btn" data-move="${p.id}" data-dir="-1" aria-label="Move ${name} earlier" ${i === 0 ? "disabled" : ""}>▲</button>
+      <button class="btn" data-move="${p.id}" data-dir="1" aria-label="Move ${name} later" ${i === ps.length - 1 ? "disabled" : ""}>▼</button>
+      <button class="btn ${armed ? "danger" : ""}" data-remove="${p.id}" aria-label="Remove ${name}">${armed ? "Tap again" : "Remove"}</button>
+    </div>`;
   }).join("") : `<span class="lbl">No players yet</span>`;
 }
-$("removes").onclick = e => {
+$("seats").onclick = e => {
+  const move = e.target.closest("[data-move]");
+  if (move) {
+    const order = state.players.map(p => p.id), i = order.indexOf(move.dataset.move), j = i + Number(move.dataset.dir);
+    if (i < 0 || j < 0 || j >= order.length) return;
+    [order[i], order[j]] = [order[j], order[i]];
+    act({type: "reorder", order});
+    return;
+  }
   const b = e.target.closest("[data-remove]");
   if (!b) return;
   clearTimeout(removeTimer);
@@ -547,9 +567,9 @@ $("removes").onclick = e => {
     act({type: "remove", target: b.dataset.remove});
   } else {
     removeArmed = b.dataset.remove;
-    removeTimer = setTimeout(() => { removeArmed = null; renderRemoves(); }, 3000);
+    removeTimer = setTimeout(() => { removeArmed = null; renderSeats(); }, 3000);
   }
-  renderRemoves();
+  renderSeats();
 };
 
 $("reset").onclick = () => {

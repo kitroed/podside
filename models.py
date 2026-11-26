@@ -246,6 +246,13 @@ class Room:
         if len(self.history) > UNDO_DEPTH:
             self.history.pop(0)
 
+    def reorder(self, order: Any) -> None:
+        """Seat players in the given order. It must list every current player exactly once."""
+        if not isinstance(order, list) or sorted(map(str, order)) != sorted(self.players) or len(order) != len(self.players):
+            raise ActionError("Seat order must list every player exactly once")
+        self.players = {pid: self.players[pid] for pid in order}
+        self.seq += 1  # not undoable, like rename: it changes no totals
+
     def _restore(self, removal: Removal) -> None:
         if len(self.players) >= MAX_PLAYERS:
             raise ActionError(f"Can't bring {removal.player.name} back: the room is full")

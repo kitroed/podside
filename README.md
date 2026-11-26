@@ -83,6 +83,7 @@ Connect to `/ws/{code}?role=display` or `/ws/{code}?role=player[&token=...]`. Al
 {"type": "rename", "target": "p1", "name": "Kit"}
 {"type": "colors", "target": "p1", "colors": "WUG"}           // deck colors; "" clears, not undoable
 {"type": "remove", "target": "p3"}                             // take a player out; undoable
+{"type": "reorder", "order": ["p3", "p1", "p2"]}               // seat order; every player once, not undoable
 {"type": "undo"}
 {"type": "reset"}                                              // new game, same players
 {"type": "settings", "starting_life": 40, "table_edits": true}
@@ -112,6 +113,8 @@ Connect to `/ws/{code}?role=display` or `/ws/{code}?role=player[&token=...]`. Al
 `last_action` is the newest entry in the undo history, or `null`. Its `action` is the server's normalised copy, not the client's message: it always has the resolved `target`, an integer `delta` (after clamping), and `source` for `cmd_damage` or `name` for `counter`, and nothing else. A `remove` has `target` and the removed player's `name` instead of a `delta`.
 
 **Removing players.** `remove` follows the edit permissions: the display can remove anyone, a player can always remove themselves, and others only with `table_edits` on. The player's seat, totals and token are kept in the undo history, so `undo` restores them in the same seat and their open phone carries on. Undo is refused while the room is full. Commander damage a removed player dealt stays on the others (it still counts toward 21), and `departed` maps their id to their name for as long as any of it remains. A removed phone's next `join` gets a new seat.
+
+**Seat order.** `reorder` sets the order of `players` (the TV's tile order and the phones' tabs). `order` must list every current player exactly once, so a stale list is rejected rather than half applied. The display can always reorder; players only with `table_edits` on. Like `rename`, it changes no totals and isn't undoable.
 
 **Grouping rapid taps.** When the same actor repeats the same action (same type, target, and source or counter name) within 400 ms of their previous one, the server folds it into that history entry instead of adding a new one. Every tap still applies and broadcasts straight away. The entry's `delta` becomes the running total and `ts` moves to the latest tap, so `seq` stays the same while `delta` changes. One undo reverses the whole group. A group that nets to zero is removed. After an undo, the entry it exposes is closed, so the next tap starts a new group.
 
@@ -147,7 +150,7 @@ Run the tests with `pip install pytest && pytest -q`.
 - [ ] Monarch, initiative, day/night, and other table-wide markers
 - [ ] Partner commanders (two damage sources per player)
 - [x] Remove players (TV settings, the player themselves, or anyone with table edits on); undoable
-- [ ] Seat reordering from the display
+- [x] Seat reordering from the display (▲▼ in the TV settings)
 - [x] Dockerfile for the home server; a reverse proxy needs WebSocket upgrade headers
 
 ## Constraints and conventions

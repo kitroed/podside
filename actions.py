@@ -85,6 +85,12 @@ def handle_action(room: Room, actor: Player | None, msg: dict[str, Any]) -> None
         p = target_player()
         room.remove_player(actor_id, {"type": "remove", "target": p.id, "name": p.name}, p.id)
 
+    elif kind == "reorder":
+        # The whole table's layout: the display, or any player when table edits are on.
+        if actor and not room.table_edits:
+            raise ActionError("Only the table display can change seats (table edits are off)")
+        room.reorder(msg.get("order"))
+
     elif kind == "undo":
         room.undo()
 

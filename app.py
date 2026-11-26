@@ -512,6 +512,8 @@ PLAYER_PAGE = """<!doctype html>
  .row .lbl{flex:1;min-width:0;font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .row .dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--src);margin-right:8px}
  .row .own{color:var(--dim);font-size:17px}
+ .reveal{display:block;width:100%;min-height:52px;padding:0;background:none;border-top:1px solid #ffffff10;
+   border-radius:0;color:var(--dim);font-size:17px;font-weight:600;text-align:left}
  .row .val{min-width:2.2ch;text-align:center;font-size:28px;font-weight:800;font-variant-numeric:tabular-nums}
  .row .val.warn{color:var(--warn)}.row .val.lethal{color:var(--lethal)}
  .row button{width:56px;height:56px;font-size:28px}
@@ -597,6 +599,7 @@ const store = {
 
 let ws = null, state = null, me = null, retry = 0, gone = false, cmdKey = null, whoKey = null;
 let viewing = null;  // player whose totals the buttons change when table edits are on; null means me
+const ownShown = new Set();  // players whose own-commander row this phone has revealed
 
 function viewId() {
   if (viewing && state.table_edits && state.players.some(x => x.id === viewing)) return viewing;
@@ -668,22 +671,27 @@ function render() {
   $("poison").className = "val" + (v.poison >= POISON_LETHAL ? " lethal" : v.poison >= POISON_LETHAL - 3 ? " warn" : "");
   $("cmdTitle").textContent = mine ? "Commander damage taken" : `Commander damage ${v.name} took`;
 
-  // One row per commander that can hit them, their own last (rare: an opponent stole it).
+  // One row per commander that can hit them. Their own commander (rare: an opponent stole it)
+  // is last and hidden behind a link until revealed or until it has damage.
   // Rebuild rows only when the players change, so a held button isn't replaced mid-hold.
   const others = state.players.filter(x => x.id !== v.id);
   const key = v.id + "/" + state.players.map(o => `${o.id}:${o.name}`).join("|");
   if (key !== cmdKey) {
     cmdKey = key;
-    const row = (o, label, aria) => `<div class="row" style="--src:${colorOf(o.id)}">
+    const row = (o, label, aria, id = "") => `<div class="row" ${id} style="--src:${colorOf(o.id)}">
       <span class="lbl"><span class="dot"></span>${label}</span>
       <button data-hold='{"type":"cmd_damage","source":"${o.id}","delta":-1}' aria-label="Less damage from ${aria}">−</button>
       <span class="val" data-src="${o.id}">0</span>
       <button data-hold='{"type":"cmd_damage","source":"${o.id}","delta":1}' aria-label="More damage from ${aria}">+</button>
     </div>`;
     $("cmd").innerHTML = others.map(o => row(o, o.id === me ? "You" : esc(o.name), esc(o.name))).join("")
-      + row(v, `<span class="own">${mine ? "Own" : `${esc(v.name)}'s own`}</span>`, "own commander")
+      + row(v, `<span class="own">${mine ? "Own" : `${esc(v.name)}'s own`}</span>`, "own commander", 'id="ownRow"')
+      + `<button class="reveal" id="ownReveal">Own commander damage…</button>`
       + (others.length ? "" : `<div class="none">Other players appear here when they join.</div>`);
   }
+  if ((v.cmd_damage[v.id] || 0) > 0) ownShown.add(v.id);  // sticky, so it can't vanish mid-use
+  $("ownRow").hidden = !ownShown.has(v.id);
+  $("ownReveal").hidden = ownShown.has(v.id);
   for (const el of $("cmd").querySelectorAll(".val[data-src]")) {
     const d = v.cmd_damage[el.dataset.src] || 0;
     el.textContent = d;
@@ -708,6 +716,12 @@ function renderTabs() {
   }
   for (const x of players) who.querySelector(`[data-life="${x.id}"]`).textContent = x.life;
 }
+
+$("cmd").addEventListener("click", e => {
+  if (!e.target.closest("#ownReveal")) return;
+  ownShown.add(viewId());
+  render();
+});
 
 $("who").onclick = e => {
   const tab = e.target.closest("[data-pid]");

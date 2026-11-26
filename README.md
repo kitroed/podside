@@ -144,6 +144,7 @@ Run the tests with `pip install pytest && pytest -q`.
 Nothing here is promised. These are possibilities, roughly in order of interest.
 
 - [x] Pages as plain files in `static/` instead of inline HTML
+- [ ] Event history for the current game: each change with its time and "time ago" (e.g. "Sam −5 life · 9:42 PM · 3 min ago")
 - [ ] Partner commanders (two damage sources per player)
 - [ ] Monarch, initiative, day/night, and other table-wide markers
 - [ ] Turn tracking and an optional turn timer

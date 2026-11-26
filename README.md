@@ -1,16 +1,21 @@
 # Podside
 
-A life tracker for in-person Commander (EDH) games of Magic: The Gathering, built for pods of three or more. A shared **table display** (TV, monitor or tablet in a browser) shows every player's totals, and each player controls their own totals from **their phone**, the way Jackbox works.
+A life tracker for in-person Commander (EDH) games of Magic: The Gathering, built for pods of three or more. A shared **table display** (TV, monitor or tablet in a browser) shows every player's totals, and each player updates totals from **their phone**, the way Jackbox works.
 
-## Status
+It runs as one small Python process with no accounts and no database, so it's easy to host on a home server and use over the local network.
 
-Early but usable. The server works (split into modules, see Code layout) and has a pytest suite. The display view and the player view are both built.
+## Features
+
+- **TV display:** large tiles with life, poison and commander damage, deck color pips, a QR code to join, and a settings panel for starting life, table edits, seat order and removing players. It keeps the screen awake.
+- **Phone controls:** big +/- buttons with hold to repeat, a commander damage picker, undo, and tabs for editing other players when table edits are on. There's a fullscreen button where the browser supports it, and the screen stays awake during a game.
+- **Undo** reverses any change exactly, and rapid taps are grouped so one undo takes back a burst.
+- **Reconnecting:** a phone that drops gets its seat back automatically.
 
 ## Quick start
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install "fastapi[standard]"
+pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
@@ -25,18 +30,19 @@ The app runs as one Docker container (see `Dockerfile` and `docker-compose.yml`)
 
 Keep it to one worker (`--workers 1`, already set in the Dockerfile). Rooms live in that one process's memory.
 
-HTTPS matters for more than security: browsers only let the display keep the screen awake on HTTPS pages (or on `localhost`).
+HTTPS matters for more than security: browsers only let the display and the phones keep their screens awake on HTTPS pages (or on `localhost`).
 
 ## Architecture
 
 ```
  Table display (TV)        Player phones
-   read + admin              own totals
+   view + admin          own totals (or anyone's
+                         with table edits on)
         \                      /
          \     WebSocket      /
           +---- Room server -+      FastAPI, single process
                    |
-              Room state            in-memory (SQLite later)
+              Room state            in memory
 ```
 
 - **The server is the only source of truth.** Clients never set values directly. They send *actions*, and the server validates them, applies them under a per-room `asyncio.Lock`, adds them to the undo log, and sends the full room state to every connection.
@@ -130,26 +136,16 @@ Connect to `/ws/{code}?role=display` or `/ws/{code}?role=player[&token=...]`. Al
 
 Run the tests with `pip install pytest && pytest -q`.
 
-## Roadmap
+## Ideas
 
-**Next up**
-- [x] Split `main.py` into modules: `models.py`, `rooms.py`, `actions.py`, `app.py`
-- [x] Turn the ad-hoc test script into a `pytest` suite (multi-client, permissions, undo, reconnect)
-- [x] Real **display view**: large tiles, commander damage on each tile (colored by source), eliminated-player styling, the join link, and a Wake Lock so the TV doesn't sleep
-- [x] QR code to join on the display (hand-rolled encoder in `qr.py`, served as SVG)
-- [x] Real **player view**: big +/- buttons, hold to repeat, a commander damage picker, undo
-- [x] Batch rapid taps for about 400 ms so the display shows "−5" instead of five −1s
+Nothing here is promised. These are possibilities, roughly in order of interest.
+
 - [ ] Static files in `static/` and templates in place of the inline HTML
-
-**Later**
-- [ ] SQLite persistence for rooms and the action log, so games survive restarts
-- [ ] Game history and stats (wins, decks, commanders) built from the action log
-- [ ] Turn tracking and an optional turn timer
-- [ ] Monarch, initiative, day/night, and other table-wide markers
 - [ ] Partner commanders (two damage sources per player)
-- [x] Remove players (TV settings, the player themselves, or anyone with table edits on); undoable
-- [x] Seat reordering from the display (▲▼ in the TV settings)
-- [x] Dockerfile for the home server; a reverse proxy needs WebSocket upgrade headers
+- [ ] Monarch, initiative, day/night, and other table-wide markers
+- [ ] Turn tracking and an optional turn timer
+- [ ] Commander art behind each tile (would need an outside card API such as Scryfall)
+- [ ] Keeping games across restarts, and game history or stats built on that
 
 ## Constraints and conventions
 

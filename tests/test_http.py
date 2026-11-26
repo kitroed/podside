@@ -43,9 +43,17 @@ def test_view_pages(client: TestClient, room_code: str, path: str) -> None:
     assert f'<script src="/{path}.js"></script>' in r.text
 
 
-@pytest.mark.parametrize("asset", ["pips.css", "shared.js", "index.css", "index.js", "display.css", "display.js", "play.css", "play.js"])
+@pytest.mark.parametrize("asset", ["pips.css", "shared.js", "index.css", "index.js", "display.css", "display.js", "play.css", "play.js",
+                                   "icon.svg", "favicon-32.png", "icon-192.png", "apple-touch-icon.png"])
 def test_page_assets_are_served(client: TestClient, asset: str) -> None:
     assert client.get(f"/{asset}").status_code == 200
+
+
+@pytest.mark.parametrize("path", ["/", "/display/{code}", "/play/{code}"])
+def test_pages_link_the_icons(client: TestClient, room_code: str, path: str) -> None:
+    html = client.get(path.format(code=room_code)).text
+    assert '<link rel="apple-touch-icon" href="/apple-touch-icon.png">' in html
+    assert '<link rel="icon" href="/icon.svg" type="image/svg+xml">' in html
 
 
 def test_config_js(client: TestClient) -> None:

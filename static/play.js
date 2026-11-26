@@ -122,9 +122,23 @@ function render() {
     el.className = "val" + (d >= CMD_LETHAL ? " lethal" : d >= CMD_LETHAL - 6 ? " warn" : "");
   }
 
-  const last = state.last_action;
-  $("undo").disabled = !last;
-  $("undo").textContent = last ? `Undo: ${describe(last)}` : "Nothing to undo";
+  renderUndo();
+}
+
+// Undo takes two taps, like leaving. The first arms it for 3 s; if the last action changes
+// meanwhile (a new tap, or someone else's), it disarms so the second tap can't undo a surprise.
+let undoArmed = null;  // {key, timer}
+const undoKey = () => state.last_action ? `${state.last_action.seq}|${describe(state.last_action)}` : "";
+function disarmUndo() {
+  if (undoArmed) clearTimeout(undoArmed.timer);
+  undoArmed = null;
+}
+function renderUndo() {
+  const last = state.last_action, b = $("undo");
+  if (undoArmed && undoArmed.key !== undoKey()) disarmUndo();
+  b.disabled = !last;
+  b.toggleAttribute("data-armed", !!undoArmed);
+  b.textContent = !last ? "Nothing to undo" : undoArmed ? `Tap again to undo: ${describe(last)}` : `Undo: ${describe(last)}`;
 }
 
 function renderTabs() {
@@ -229,7 +243,16 @@ $("join").onsubmit = e => {
   if (!name) { $("name").focus(); return; }
   act({type: "join", name, colors: pickerValue($("joinColors"))});
 };
-$("undo").onclick = () => act({type: "undo"});
+$("undo").onclick = () => {
+  if (!state.last_action) return;
+  if (undoArmed) {
+    disarmUndo();
+    act({type: "undo"});
+  } else {
+    undoArmed = {key: undoKey(), timer: setTimeout(() => { undoArmed = null; renderUndo(); }, 3000)};
+  }
+  renderUndo();
+};
 // ---- name and deck colors ------------------------------------------------------------
 
 function makePicker(el) {

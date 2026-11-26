@@ -96,11 +96,28 @@ def test_cmd_damage_permission(table: Table) -> None:
     assert "own totals" in table.reject(a, type="cmd_damage", target=b.player_id, source=a.player_id, delta=1)
 
 
-@pytest.mark.parametrize("source", [None, "p1", "p9"])
+@pytest.mark.parametrize("source", [None, "p9"])
 def test_cmd_damage_invalid_source(table: Table, source: str | None) -> None:
     a = table.player("A")
     table.player("B")
     assert "source" in table.reject(a, type="cmd_damage", source=source, delta=1)
+
+
+def test_cmd_damage_from_own_commander(table: Table) -> None:
+    # Rare but legal: an opponent steals your commander and attacks you with it.
+    a = table.player("A")
+    s = table.act(a, type="cmd_damage", source=a.player_id, delta=21)
+    assert player(s, "p1")["cmd_damage"] == {"p1": 21}
+    assert player(s, "p1")["life"] == 19
+    assert player(s, "p1")["eliminated"] is True
+    s = table.act(a, type="undo")
+    assert player(s, "p1")["cmd_damage"] == {} and player(s, "p1")["life"] == 40
+
+
+def test_cmd_damage_from_own_commander_permission(table: Table) -> None:
+    a, b = table.player("A"), table.player("B")
+    table.restrict_edits(a)
+    assert "own totals" in table.reject(a, type="cmd_damage", target=b.player_id, source=b.player_id, delta=1)
 
 
 def test_cmd_damage_undo_reverts_both(table: Table) -> None:

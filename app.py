@@ -303,7 +303,8 @@ function outReason(p, names) {
   if (p.life <= 0) return `Life ${p.life}`;
   if (p.poison >= POISON_LETHAL) return `Poison ${p.poison}`;
   const [src, d] = Object.entries(p.cmd_damage).find(([, d]) => d >= CMD_LETHAL) || [];
-  return src ? `${names[src] || src}'s commander ${d}` : "";
+  if (!src) return "";
+  return src === p.id ? `Own commander ${d}` : `${names[src] || src}'s commander ${d}`;
 }
 
 function tile(p, names) {
@@ -314,7 +315,8 @@ function tile(p, names) {
   }
   for (const [src, d] of Object.entries(p.cmd_damage)) {
     const cls = d >= CMD_LETHAL ? "lethal" : d >= CMD_LETHAL - 6 ? "warn" : "";
-    extras.push(`<span class="pill cmd ${cls}" style="--src:${colorOf(src)}"><span class="k">${esc(names[src] || src)}</span>${d}</span>`);
+    const label = src === p.id ? "Own" : esc(names[src] || src);
+    extras.push(`<span class="pill cmd ${cls}" style="--src:${colorOf(src)}"><span class="k">${label}</span>${d}</span>`);
   }
   for (const [name, n] of Object.entries(p.counters)) {
     extras.push(`<span class="pill"><span class="k">${esc(name[0].toUpperCase() + name.slice(1))}</span>${n}</span>`);
@@ -509,6 +511,7 @@ PLAYER_PAGE = """<!doctype html>
  .row + .row{border-top:1px solid #ffffff10}
  .row .lbl{flex:1;min-width:0;font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .row .dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--src);margin-right:8px}
+ .row .own{color:var(--dim);font-size:17px}
  .row .val{min-width:2.2ch;text-align:center;font-size:28px;font-weight:800;font-variant-numeric:tabular-nums}
  .row .val.warn{color:var(--warn)}.row .val.lethal{color:var(--lethal)}
  .row button{width:56px;height:56px;font-size:28px}
@@ -665,17 +668,21 @@ function render() {
   $("poison").className = "val" + (v.poison >= POISON_LETHAL ? " lethal" : v.poison >= POISON_LETHAL - 3 ? " warn" : "");
   $("cmdTitle").textContent = mine ? "Commander damage taken" : `Commander damage ${v.name} took`;
 
-  // Rebuild rows only when the opponents change, so a held button isn't replaced mid-hold.
+  // One row per commander that can hit them, their own last (rare: an opponent stole it).
+  // Rebuild rows only when the players change, so a held button isn't replaced mid-hold.
   const others = state.players.filter(x => x.id !== v.id);
-  const key = v.id + "/" + others.map(o => `${o.id}:${o.name}`).join("|");
+  const key = v.id + "/" + state.players.map(o => `${o.id}:${o.name}`).join("|");
   if (key !== cmdKey) {
     cmdKey = key;
-    $("cmd").innerHTML = others.length ? others.map(o => `<div class="row" style="--src:${colorOf(o.id)}">
-      <span class="lbl"><span class="dot"></span>${o.id === me ? "You" : esc(o.name)}</span>
-      <button data-hold='{"type":"cmd_damage","source":"${o.id}","delta":-1}' aria-label="Less damage from ${esc(o.name)}">−</button>
+    const row = (o, label, aria) => `<div class="row" style="--src:${colorOf(o.id)}">
+      <span class="lbl"><span class="dot"></span>${label}</span>
+      <button data-hold='{"type":"cmd_damage","source":"${o.id}","delta":-1}' aria-label="Less damage from ${aria}">−</button>
       <span class="val" data-src="${o.id}">0</span>
-      <button data-hold='{"type":"cmd_damage","source":"${o.id}","delta":1}' aria-label="More damage from ${esc(o.name)}">+</button>
-    </div>`).join("") : `<div class="none">Other players appear here when they join.</div>`;
+      <button data-hold='{"type":"cmd_damage","source":"${o.id}","delta":1}' aria-label="More damage from ${aria}">+</button>
+    </div>`;
+    $("cmd").innerHTML = others.map(o => row(o, o.id === me ? "You" : esc(o.name), esc(o.name))).join("")
+      + row(v, `<span class="own">${mine ? "Own" : `${esc(v.name)}'s own`}</span>`, "own commander")
+      + (others.length ? "" : `<div class="none">Other players appear here when they join.</div>`);
   }
   for (const el of $("cmd").querySelectorAll(".val[data-src]")) {
     const d = v.cmd_damage[el.dataset.src] || 0;
@@ -719,7 +726,10 @@ function describe({actor, action: a}) {
   const who = nameOf(a.target || actor), d = Number(a.delta);
   if (a.type === "life") return `${who} ${signed(d)} life`;
   if (a.type === "poison") return `${who} ${signed(d)} poison`;
-  if (a.type === "cmd_damage") return `${who} ${signed(d)} cmd damage from ${nameOf(a.source)}`;
+  if (a.type === "cmd_damage") {
+    if (a.source === (a.target || actor)) return `${who} ${signed(d)} own cmd damage`;
+    return `${who} ${signed(d)} cmd damage from ${nameOf(a.source)}`;
+  }
   if (a.type === "counter") return `${who} ${signed(d)} ${a.name}`;
   return a.type;
 }

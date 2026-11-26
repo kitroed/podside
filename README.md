@@ -78,7 +78,7 @@ Connect to `/ws/{code}?role=display` or `/ws/{code}?role=player[&token=...]`. Al
 {"type": "join", "name": "Kit"}                                // player connections only
 {"type": "life", "target": "p1", "delta": -3}
 {"type": "poison", "target": "p1", "delta": 1}
-{"type": "cmd_damage", "target": "p1", "source": "p2", "delta": 5}
+{"type": "cmd_damage", "target": "p1", "source": "p2", "delta": 5}  // source may equal target (a stolen commander)
 {"type": "counter", "target": "p1", "name": "energy", "delta": 1}
 {"type": "rename", "target": "p1", "name": "Kit"}
 {"type": "undo"}

@@ -49,7 +49,8 @@ def handle_action(room: Room, actor: Player | None, msg: dict[str, Any]) -> None
     elif kind == "cmd_damage":
         p = target_player()
         source = msg.get("source")
-        if source not in room.players or source == p.id:
+        # The source can be the target: an opponent can steal your commander and hit you with it.
+        if source not in room.players:
             raise ActionError("Invalid commander damage source")
         delta = as_delta(msg.get("delta"))
         delta = max(delta, -p.cmd_damage.get(source, 0))

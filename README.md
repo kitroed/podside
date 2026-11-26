@@ -28,7 +28,7 @@ The app runs as one Docker container (see `Dockerfile` and `docker-compose.yml`)
 1. Copy `deploy.sh.example` to `deploy.sh`, set `HOST` and `REMOTE_DIR`, and run `sh deploy.sh`. It rsyncs the source to the server and runs `docker compose up -d --build` there. A redeploy ends any games in progress, because rooms live in memory.
 2. In Nginx Proxy Manager, add a proxy host for the subdomain: scheme `http`, forward to the Docker host's IP on port `8086` (the host port in `docker-compose.yml`), and turn on **Websockets Support**. On the SSL tab, request a Let's Encrypt certificate and turn on **Force SSL**.
 
-Keep it to one worker (`--workers 1`, already set in the Dockerfile). Rooms live in that one process's memory.
+Keep it to one worker (`--workers 1`, already set in the Dockerfile). One process hosts any number of rooms at once, but they live in its memory, so a second worker would have its own separate set of rooms.
 
 HTTPS matters for more than security: browsers only let the display and the phones keep their screens awake on HTTPS pages (or on `localhost`).
 
@@ -153,6 +153,6 @@ Nothing here is promised. These are possibilities, roughly in order of interest.
 ## Constraints and conventions
 
 - Python 3.11+, FastAPI, with no build step for the front end (vanilla JS, or htmx/Alpine if needed)
-- Single process, in-memory state. Don't add Redis unless it's ever run as more than one instance
+- One server process holds every room in memory; any number of games can run at once. Shared storage such as Redis would only be needed to run more than one process
 - Every state change goes through `handle_action()` → `Room.commit()` so undo and history stay correct. The exception is removing a player, which can't be expressed as `Change` tuples: `Room.remove_player()` logs the whole player instead, and `undo` puts them back
 - Never send player tokens in broadcast state (`Player.public()` leaves them out)

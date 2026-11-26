@@ -30,7 +30,10 @@ def test_unknown_room_404(client: TestClient) -> None:
 
 
 def test_index(client: TestClient) -> None:
-    assert client.get("/").status_code == 200
+    html = client.get("/").text
+    assert "<title>EDH Table</title>" in html
+    assert 'id="start"' in html and 'id="code"' in html  # start a game, join by code
+    assert "__" not in html  # pip CSS placeholder filled in
 
 
 @pytest.mark.parametrize("path", ["display", "play"])

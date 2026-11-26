@@ -1,6 +1,6 @@
-# MTG Life Tracker
+# EDH Table
 
-A multiplayer Magic: The Gathering life tracker for in-person play. A shared **table display** (TV, monitor or tablet in a browser) shows every player's totals, and each player controls their own totals from **their phone**, the way Jackbox works.
+A life tracker for in-person Commander (EDH) games of Magic: The Gathering, built for pods of three or more. A shared **table display** (TV, monitor or tablet in a browser) shows every player's totals, and each player controls their own totals from **their phone**, the way Jackbox works.
 
 Existing apps (Playgroup.gg, Sideboard, Signet, Moxtopper) either run on one shared device or sync phone to phone. None of them have a real big-screen view that is separate from the phones. That gap is what this project is for.
 
@@ -16,7 +16,7 @@ pip install "fastapi[standard]"
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Open `http://<host>:8000/` and click **Create room**. Open the display link on the TV and the player link on each phone.
+Open `http://<host>:8000/` on the TV and click **Start a game**; that screen becomes the scoreboard. Players scan its QR code, or open the same address on their phone and type the 4-letter room code.
 
 ## Deploying
 
@@ -64,7 +64,7 @@ HTTPS matters for more than security: browsers only let the display keep the scr
 | `POST` | `/api/rooms?starting_life=40` | Create a room. Returns `code`, `display_url`, `play_url` |
 | `GET` | `/api/rooms/{code}` | Current room snapshot |
 | `GET` | `/api/rooms/{code}/qr.svg?base=https://host` | QR code (SVG) for `{base}/play/{code}`. The display passes its own origin, so the code matches the proxy's domain. `base` must be `http(s)://host[:port]` with no path |
-| `GET` | `/` | Landing page with a "Create room" button |
+| `GET` | `/` | Landing page: start a game (this screen becomes the scoreboard) or join one by room code |
 | `GET` | `/display/{code}` | Display view for the TV |
 | `GET` | `/play/{code}` | Player view for phones |
 

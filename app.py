@@ -57,7 +57,7 @@ async def lifespan(_: FastAPI):
     task.cancel()
 
 
-app = FastAPI(title="MTG Life Tracker", lifespan=lifespan)
+app = FastAPI(title="EDH Table", lifespan=lifespan)
 
 
 @app.post("/api/rooms")
@@ -161,16 +161,100 @@ const pips = c => !c ? "" : `<span class="pips" role="img" aria-label="${[...c].
   + [...c].map(x => `<span class="pip pip-${x}" aria-hidden="true">${x}</span>`).join("") + "</span>";
 """
 
-INDEX_PAGE = """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MTG tracker</title><style>body{font-family:system-ui;margin:2rem;background:#111;color:#eee}a{color:#8cf}</style></head>
-<body><h1>MTG life tracker</h1><button onclick="go()">Create room</button><div id="out"></div>
+INDEX_PAGE = """<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+<meta name="description" content="Life totals on the big screen, controls on every phone. Built for EDH pods.">
+<title>EDH Table</title>
+<style>
+__PIP_CSS__ :root{--bg:#0b0d10;--card:#171a21;--fg:#f4f5f7;--dim:#9aa1ad;--accent:#3e63dd;--warn:#ffb224}
+ *{box-sizing:border-box}
+ html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+ body{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+   padding:40px 16px;background:radial-gradient(ellipse 90% 60% at 50% 0%,#1b2233 0%,var(--bg) 70%)}
+ .hero{text-align:center;margin-bottom:clamp(28px,6vh,64px)}
+ .hero .pips{font-size:clamp(30px,4.5vw,60px);gap:.35em;margin-bottom:.35em}
+ h1{margin:0;font-size:clamp(52px,9vw,136px);font-weight:900;letter-spacing:-.02em;line-height:1}
+ .tag{margin:.55em 0 0;font-size:clamp(18px,2.4vw,30px);color:var(--dim)}
+ .cards{display:grid;grid-template-columns:repeat(2,minmax(0,440px));gap:24px;width:100%;justify-content:center}
+ .card{background:var(--card);border-radius:20px;padding:28px;display:flex;flex-direction:column;gap:14px}
+ .card h2{margin:0;font-size:26px}
+ .card p{margin:0;color:var(--dim);font-size:17px;line-height:1.45}
+ .btn{min-height:64px;border:0;border-radius:14px;font:inherit;font-size:22px;font-weight:800;color:#fff;
+   background:var(--accent);cursor:pointer;margin-top:auto}
+ .btn:disabled{opacity:.5;cursor:default}
+ .code{display:flex;gap:10px;margin-top:auto}
+ .code input{flex:1;min-width:0;height:64px;border-radius:14px;border:2px solid #343a48;background:#0f1218;color:var(--fg);
+   font:inherit;font-size:32px;font-weight:800;letter-spacing:.3em;text-align:center;text-transform:uppercase}
+ .code input::placeholder{color:#3a404c}
+ .code input:focus{outline:none;border-color:var(--accent)}
+ .code .btn{padding:0 24px;margin-top:0}
+ .err{color:var(--warn);font-size:16px;min-height:1.3em}
+ @media (max-width:760px){.cards{grid-template-columns:minmax(0,480px)}.join{order:-1}}
+</style></head>
+<body>
+<header class="hero">
+  <div class="pips" aria-hidden="true"><span class="pip pip-W">W</span><span class="pip pip-U">U</span><span class="pip pip-B">B</span><span class="pip pip-R">R</span><span class="pip pip-G">G</span></div>
+  <h1>EDH Table</h1>
+  <p class="tag">Life totals on the big screen. Controls on every phone.</p>
+</header>
+<main class="cards">
+  <section class="card start">
+    <h2>Start a game</h2>
+    <p>Open this on the TV. It becomes the scoreboard, with a QR code for everyone to join.</p>
+    <button class="btn" id="start">Start a game</button>
+    <p class="err" id="startErr" role="alert"></p>
+  </section>
+  <section class="card join">
+    <h2>Join a game</h2>
+    <p>Scan the QR code on the TV, or type the room code.</p>
+    <form class="code" id="joinForm">
+      <input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false"
+        placeholder="ABCD" aria-label="Room code" enterkeyhint="go">
+      <button class="btn" type="submit">Join</button>
+    </form>
+    <p class="err" id="joinErr" role="alert"></p>
+  </section>
+</main>
 <script>
-async function go(){
-  const r = await (await fetch('/api/rooms', {method:'POST'})).json();
-  out.innerHTML = `<p>Room <b>${r.code}</b></p><p><a href="${r.display_url}" target="_blank">Table display</a></p>
-    <p><a href="${r.play_url}" target="_blank">Player link</a> (open on each phone)</p>`;
-}
-</script></body></html>"""
+"use strict";
+const $ = id => document.getElementById(id);
+
+$("start").onclick = async () => {
+  $("start").disabled = true;
+  $("startErr").textContent = "";
+  try {
+    const r = await fetch("/api/rooms", {method: "POST"});
+    if (!r.ok) throw new Error(r.status);
+    location.href = (await r.json()).display_url;  // this screen becomes the scoreboard
+  } catch {
+    $("startErr").textContent = "Couldn't start a game. Check the connection and try again.";
+    $("start").disabled = false;
+  }
+};
+addEventListener("pageshow", () => { $("start").disabled = false; });  // after Back from the scoreboard
+
+$("code").addEventListener("input", e => {
+  e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
+  $("joinErr").textContent = "";
+});
+$("joinForm").onsubmit = async e => {
+  e.preventDefault();
+  const code = $("code").value;
+  if (code.length !== 4) { $("joinErr").textContent = "Room codes are 4 letters."; return; }
+  try {
+    const r = await fetch(`/api/rooms/${code}`);
+    if (r.status === 404) { $("joinErr").textContent = `No game with code ${code}. Check the TV.`; return; }
+    if (!r.ok) throw new Error(r.status);
+    location.href = `/play/${code}`;
+  } catch {
+    $("joinErr").textContent = "Couldn't reach the server. Try again.";
+  }
+};
+</script>
+</body></html>"""
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +265,7 @@ DISPLAY_PAGE = """<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Room __CODE__ · MTG tracker</title>
+<title>Room __CODE__ · EDH Table</title>
 <style>
 __PIP_CSS__ :root{--bg:#0b0d10;--tile:#171a21;--fg:#f4f5f7;--dim:#9aa1ad;--warn:#ffb224;--lethal:#ff4d4f;--radius:1.6vh}
  *{box-sizing:border-box}
@@ -502,7 +586,7 @@ PLAYER_PAGE = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0d10">
-<title>Room __CODE__ · MTG tracker</title>
+<title>Room __CODE__ · EDH Table</title>
 <style>
 __PIP_CSS__ :root{--bg:#0b0d10;--card:#171a21;--btn:#262b36;--fg:#f4f5f7;--dim:#9aa1ad;--warn:#ffb224;--lethal:#ff4d4f;--c:#343a48}
  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -587,7 +671,7 @@ __PIP_CSS__ :root{--bg:#0b0d10;--card:#171a21;--btn:#262b36;--fg:#f4f5f7;--dim:#
 </style></head>
 <body>
 <header>
-  <button class="me" id="me" aria-label="Edit name and deck colors">MTG tracker</button>
+  <button class="me" id="me" aria-label="Edit name and deck colors">EDH Table</button>
   <span class="status" id="status" hidden>reconnecting…</span>
   <span class="room">__CODE__</span>
   <button class="fs" id="fs" aria-label="Full screen" aria-pressed="false" hidden></button>
@@ -711,7 +795,7 @@ function show(which) {
 function render() {
   const p = me && state.players.find(x => x.id === me);
   if (!p) {
-    $("me").textContent = "MTG tracker";
+    $("me").textContent = "EDH Table";
     if ($("join").hidden) { show("join"); }
     return;
   }
@@ -970,7 +1054,7 @@ def _render(page: str, code: str) -> str:
 
 @app.get("/", response_class=HTMLResponse)
 async def index() -> str:
-    return INDEX_PAGE
+    return INDEX_PAGE.replace("__PIP_CSS__", PIP_CSS)
 
 
 def _room_code(code: str) -> str:

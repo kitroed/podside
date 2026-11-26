@@ -69,8 +69,10 @@ HTTPS matters for more than security: browsers only let the display and the phon
 | `GET` | `/api/rooms/{code}` | Current room snapshot |
 | `GET` | `/api/rooms/{code}/qr.svg?base=https://host` | QR code (SVG) for `{base}/play/{code}`. The display passes its own origin, so the code matches the proxy's domain. `base` must be `http(s)://host[:port]` with no path |
 | `GET` | `/` | Landing page: start a game (this screen becomes the scoreboard) or join one by room code |
-| `GET` | `/display/{code}` | Display view for the TV |
-| `GET` | `/play/{code}` | Player view for phones |
+| `GET` | `/display/{code}` | Display view for the TV (404 if the room doesn't exist) |
+| `GET` | `/play/{code}` | Player view for phones (404 if the room doesn't exist) |
+| `GET` | `/config.js` | Rule numbers and seat colors for the pages, generated from the Python constants |
+| `GET` | `/{file}` | Other files in `static/` (CSS and JS), served by `app.frontend()` after every other route |
 
 ## WebSocket protocol
 
@@ -129,7 +131,8 @@ Connect to `/ws/{code}?role=display` or `/ws/{code}?role=player[&token=...]`. Al
 | `models.py` | Config constants, `ActionError`, and the domain model: `Player`, `Change`, `LogEntry`, `Room` (state, apply/commit/undo/reset) |
 | `rooms.py` | `RoomManager` and the shared `manager`: create/get rooms, idle cleanup |
 | `actions.py` | `handle_action()`: validates and applies each action type |
-| `app.py` | FastAPI routes, the `/ws/{code}` endpoint, `broadcast_state()`, and the inline HTML pages: the landing page, the display view and the player view |
+| `app.py` | FastAPI routes, the `/ws/{code}` endpoint, `broadcast_state()`, and serving the pages |
+| `static/` | The pages as plain files: `index`, `display` and `play` (`.html`, `.css`, `.js` each), plus `pips.css` and `pips.js`, the shared deck color pips. The pages read the room code from their URL |
 | `qr.py` | Small QR encoder (byte mode, level M) with no dependencies, used for the join code |
 | `main.py` | Entry point that re-exports `app`, so `uvicorn main:app` works |
 | `tests/` | pytest suite. `conftest.py` has a `Table` helper that drives a display and several players over real WebSockets |
@@ -140,7 +143,7 @@ Run the tests with `pip install pytest && pytest -q`.
 
 Nothing here is promised. These are possibilities, roughly in order of interest.
 
-- [ ] Static files in `static/` and templates in place of the inline HTML
+- [x] Pages as plain files in `static/` instead of inline HTML
 - [ ] Partner commanders (two damage sources per player)
 - [ ] Monarch, initiative, day/night, and other table-wide markers
 - [ ] Turn tracking and an optional turn timer

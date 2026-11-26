@@ -30,19 +30,34 @@ def test_unknown_room_404(client: TestClient) -> None:
 
 
 def test_index(client: TestClient) -> None:
-    html = client.get("/").text
-    assert "<title>Podside</title>" in html
-    assert 'id="start"' in html and 'id="code"' in html  # start a game, join by code
-    assert "__" not in html  # pip CSS placeholder filled in
+    r = client.get("/")
+    assert "<title>Podside</title>" in r.text
+    assert 'id="start"' in r.text and 'id="code"' in r.text  # start a game, join by code
+    assert r.headers["cache-control"] == "no-cache"  # browsers pick up new files after a deploy
 
 
 @pytest.mark.parametrize("path", ["display", "play"])
 def test_view_pages(client: TestClient, room_code: str, path: str) -> None:
-    html = client.get(f"/{path}/{room_code.lower()}").text
-    assert f'const CODE = "{room_code}";' in html  # normalised to upper case
-    assert "const POISON_LETHAL = 10, CMD_LETHAL = 21;" in html
-    assert 'const COLORS = ["#e5484d", ' in html
-    assert "__" not in html  # every placeholder was filled in
+    r = client.get(f"/{path}/{room_code.lower()}")
+    assert r.headers["content-type"].startswith("text/html")
+    assert f'<script src="/{path}.js"></script>' in r.text
+
+
+@pytest.mark.parametrize("asset", ["pips.css", "pips.js", "index.css", "index.js", "display.css", "display.js", "play.css", "play.js"])
+def test_page_assets_are_served(client: TestClient, asset: str) -> None:
+    assert client.get(f"/{asset}").status_code == 200
+
+
+def test_config_js(client: TestClient) -> None:
+    r = client.get("/config.js")
+    assert r.headers["content-type"].startswith("text/javascript")
+    assert "const POISON_LETHAL = 10, CMD_LETHAL = 21;" in r.text
+    assert 'const COLORS = ["#e5484d", ' in r.text
+
+
+def test_unknown_static_path_404(client: TestClient) -> None:
+    assert client.get("/nope.js").status_code == 404
+    assert client.get("/display").status_code == 404
 
 
 def test_ws_unknown_room(client: TestClient) -> None:

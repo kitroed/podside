@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Podside</title>
+<link rel="stylesheet" href="/pips.css">
+<link rel="stylesheet" href="/display.css">
+</head>
+<body>
+<header>
+  <div class="join" id="join"></div>
+  <div class="status" id="status" hidden>reconnecting…</div>
+  <div class="code" id="roomCode" aria-label="Room code"></div>
+  <img class="hqr" id="hqr" alt="QR code to join" hidden>
+</header>
+<main id="tiles"></main>
+
+<button class="gear" id="gear" aria-label="Table settings">⚙</button>
+<dialog id="panel">
+  <div class="row panel-head"><h2>Table</h2><button class="btn" id="close">Close</button></div>
+  <div class="row"><span class="lbl">Undo last change</span><button class="btn primary" data-act="undo">Undo</button></div>
+  <div class="row"><span class="lbl">Anyone can edit anyone</span><button class="btn" id="edits" aria-pressed="false">Off</button></div>
+  <div class="row"><span class="lbl">Starting life</span>
+    <button class="btn" data-life="-1" aria-label="Lower starting life">−</button>
+    <span class="val" id="startLife">40</span>
+    <button class="btn" data-life="1" aria-label="Raise starting life">+</button></div>
+  <div class="row"><span class="lbl">New game, same players</span><button class="btn danger" id="reset">New game</button></div>
+  <div class="row"><span class="lbl">Players: ▲▼ to match where people sit</span></div>
+  <div class="seats" id="seats"></div>
+  <div class="row"><span class="lbl">Full screen</span><button class="btn" id="fs">Full screen</button></div>
+</dialog>
+<div class="toast" id="toast" hidden></div>
+
+<script src="/config.js"></script>
+<script src="/pips.js"></script>
+<script src="/display.js"></script>
+
+</body></html>

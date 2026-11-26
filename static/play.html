@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+<title>Podside</title>
+<link rel="stylesheet" href="/pips.css">
+<link rel="stylesheet" href="/play.css">
+</head>
+<body>
+<header>
+  <button class="me" id="me" aria-label="Edit name and deck colors">Podside</button>
+  <span class="status" id="status" hidden>reconnecting…</span>
+  <span class="room" id="roomCode"></span>
+  <button class="fs" id="fs" aria-label="Full screen" aria-pressed="false" hidden></button>
+</header>
+
+<div class="msg" id="loading">Connecting…</div>
+
+<form class="join" id="join" hidden>
+  <h1>Join room <span id="joinCode"></span></h1>
+  <p id="joinNote">Your name shows on the table display.</p>
+  <input id="name" maxlength="24" autocomplete="nickname" placeholder="Your name" enterkeyhint="go">
+  <p>Deck colors (optional)</p>
+  <div class="picker" id="joinColors" role="group" aria-label="Deck colors"></div>
+  <button type="submit">Join</button>
+</form>
+
+<main id="game" hidden>
+  <nav class="who" id="who" aria-label="Whose totals to change" hidden></nav>
+  <div>
+    <div class="target" id="target" hidden></div>
+    <div class="life" id="life">40</div>
+    <div class="outnote" id="outnote" hidden></div>
+  </div>
+  <div class="pad">
+    <button class="minus" data-hold='{"type":"life","delta":-1}' aria-label="Lose 1 life">−1</button>
+    <button class="plus" data-hold='{"type":"life","delta":1}' aria-label="Gain 1 life">+1</button>
+    <button class="minus small" data-hold='{"type":"life","delta":-5}' aria-label="Lose 5 life">−5</button>
+    <button class="plus small" data-hold='{"type":"life","delta":5}' aria-label="Gain 5 life">+5</button>
+  </div>
+  <section class="card">
+    <div class="row">
+      <span class="lbl">Poison</span>
+      <button data-hold='{"type":"poison","delta":-1}' aria-label="Remove poison">−</button>
+      <span class="val" id="poison">0</span>
+      <button data-hold='{"type":"poison","delta":1}' aria-label="Add poison">+</button>
+    </div>
+  </section>
+  <section class="card">
+    <h2 id="cmdTitle">Commander damage taken</h2>
+    <div id="cmd"></div>
+  </section>
+  <button class="remove" id="removeOther" hidden></button>
+</main>
+
+<footer id="footer" hidden><button class="undo" id="undo" disabled>Nothing to undo</button></footer>
+<dialog id="edit">
+  <form id="editForm">
+    <h2>Name and deck</h2>
+    <label class="fld">Name<input id="editName" maxlength="24" autocomplete="nickname"></label>
+    <div class="fld">Deck colors<div class="picker" id="editColors" role="group" aria-label="Deck colors"></div></div>
+    <div class="actions"><button type="button" id="editCancel">Cancel</button><button type="submit" class="primary">Save</button></div>
+    <button type="button" class="remove" id="leave">Leave this game</button>
+  </form>
+</dialog>
+<div class="toast" id="toast" hidden></div>
+
+<script src="/config.js"></script>
+<script src="/pips.js"></script>
+<script src="/play.js"></script>
+
+</body></html>

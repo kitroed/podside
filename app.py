@@ -488,6 +488,16 @@ PLAYER_PAGE = """<!doctype html>
    font-variant-numeric:tabular-nums;padding:8px 0;letter-spacing:-.02em}
  .life.low{color:var(--warn)}
  .outnote{text-align:center;color:var(--lethal);font-weight:800;font-size:22px;margin-top:-6px}
+ .who{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+ .who::-webkit-scrollbar{display:none}
+ .tab{flex:0 0 auto;min-width:72px;min-height:56px;padding:4px 14px;display:flex;flex-direction:column;
+   align-items:center;justify-content:center;background:var(--card);border:2px solid transparent;border-top:4px solid var(--tc)}
+ .tab .n{max-width:9ch;font-size:15px;font-weight:600;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .tab .l{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+ .tab[aria-pressed="true"]{border-color:var(--tc);background:#232733}
+ .tab[aria-pressed="true"] .n{color:var(--fg)}
+ .target{text-align:center;font-size:20px;font-weight:700;color:var(--c);margin-bottom:-8px;
+   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .pad{display:grid;grid-template-columns:1fr 1fr;gap:12px}
  .pad button{font-size:40px;height:96px}
  .pad .small{font-size:26px;height:64px}
@@ -536,7 +546,9 @@ PLAYER_PAGE = """<!doctype html>
 </form>
 
 <main id="game" hidden>
+  <nav class="who" id="who" aria-label="Whose totals to change" hidden></nav>
   <div>
+    <div class="target" id="target" hidden></div>
     <div class="life" id="life">40</div>
     <div class="outnote" id="outnote" hidden></div>
   </div>
@@ -555,7 +567,7 @@ PLAYER_PAGE = """<!doctype html>
     </div>
   </section>
   <section class="card">
-    <h2>Commander damage taken</h2>
+    <h2 id="cmdTitle">Commander damage taken</h2>
     <div id="cmd"></div>
   </section>
 </main>
@@ -580,7 +592,15 @@ const store = {
   set(v) { try { localStorage.setItem(TOKEN_KEY, v); } catch {} },
 };
 
-let ws = null, state = null, me = null, retry = 0, gone = false, cmdKey = null;
+let ws = null, state = null, me = null, retry = 0, gone = false, cmdKey = null, whoKey = null;
+let viewing = null;  // player whose totals the buttons change when table edits are on; null means me
+
+function viewId() {
+  if (viewing && state.table_edits && state.players.some(x => x.id === viewing)) return viewing;
+  return me;
+}
+// Buttons carry the action; the target is whoever is selected when the press starts.
+const msgFor = btn => ({...JSON.parse(btn.dataset.hold), target: viewId()});
 
 // ---- connection -------------------------------------------------------------
 
@@ -628,29 +648,37 @@ function render() {
     return;
   }
   show("game");
-  document.documentElement.style.setProperty("--c", colorOf(p.id));
   $("me").innerHTML = `${esc(p.name)} <small>✎</small>`;
-  $("life").textContent = p.life;
-  $("life").className = "life" + (!p.eliminated && p.life <= 10 ? " low" : "");
-  $("outnote").hidden = !p.eliminated;
-  $("outnote").textContent = "You're out";
-  $("poison").textContent = p.poison;
-  $("poison").className = "val" + (p.poison >= POISON_LETHAL ? " lethal" : p.poison >= POISON_LETHAL - 3 ? " warn" : "");
+  if (!state.table_edits) viewing = null;
+  renderTabs();
+
+  const v = state.players.find(x => x.id === viewId());  // whose totals are on screen
+  const mine = v.id === me;
+  document.documentElement.style.setProperty("--c", colorOf(v.id));
+  $("target").hidden = mine;
+  $("target").textContent = `${v.name}'s life`;
+  $("life").textContent = v.life;
+  $("life").className = "life" + (!v.eliminated && v.life <= 10 ? " low" : "");
+  $("outnote").hidden = !v.eliminated;
+  $("outnote").textContent = mine ? "You're out" : `${v.name} is out`;
+  $("poison").textContent = v.poison;
+  $("poison").className = "val" + (v.poison >= POISON_LETHAL ? " lethal" : v.poison >= POISON_LETHAL - 3 ? " warn" : "");
+  $("cmdTitle").textContent = mine ? "Commander damage taken" : `Commander damage ${v.name} took`;
 
   // Rebuild rows only when the opponents change, so a held button isn't replaced mid-hold.
-  const others = state.players.filter(x => x.id !== me);
-  const key = others.map(o => `${o.id}:${o.name}`).join("|");
+  const others = state.players.filter(x => x.id !== v.id);
+  const key = v.id + "/" + others.map(o => `${o.id}:${o.name}`).join("|");
   if (key !== cmdKey) {
     cmdKey = key;
     $("cmd").innerHTML = others.length ? others.map(o => `<div class="row" style="--src:${colorOf(o.id)}">
-      <span class="lbl"><span class="dot"></span>${esc(o.name)}</span>
+      <span class="lbl"><span class="dot"></span>${o.id === me ? "You" : esc(o.name)}</span>
       <button data-hold='{"type":"cmd_damage","source":"${o.id}","delta":-1}' aria-label="Less damage from ${esc(o.name)}">−</button>
       <span class="val" data-src="${o.id}">0</span>
       <button data-hold='{"type":"cmd_damage","source":"${o.id}","delta":1}' aria-label="More damage from ${esc(o.name)}">+</button>
     </div>`).join("") : `<div class="none">Other players appear here when they join.</div>`;
   }
   for (const el of $("cmd").querySelectorAll(".val[data-src]")) {
-    const d = p.cmd_damage[el.dataset.src] || 0;
+    const d = v.cmd_damage[el.dataset.src] || 0;
     el.textContent = d;
     el.className = "val" + (d >= CMD_LETHAL ? " lethal" : d >= CMD_LETHAL - 6 ? " warn" : "");
   }
@@ -659,6 +687,27 @@ function render() {
   $("undo").disabled = !last;
   $("undo").textContent = last ? `Undo: ${describe(last)}` : "Nothing to undo";
 }
+
+function renderTabs() {
+  const who = $("who");
+  const players = [...state.players].sort((a, b) => (b.id === me) - (a.id === me));  // me first
+  who.hidden = !state.table_edits || players.length < 2;
+  if (who.hidden) { whoKey = null; return; }
+  const key = viewId() + "/" + players.map(x => `${x.id}:${x.name}`).join("|");
+  if (key !== whoKey) {  // rebuild only on change so a tap in progress isn't lost
+    whoKey = key;
+    who.innerHTML = players.map(x => `<button class="tab" data-pid="${x.id}" aria-pressed="${x.id === viewId()}"
+      style="--tc:${colorOf(x.id)}"><span class="n">${x.id === me ? "You" : esc(x.name)}</span><span class="l" data-life="${x.id}"></span></button>`).join("");
+  }
+  for (const x of players) who.querySelector(`[data-life="${x.id}"]`).textContent = x.life;
+}
+
+$("who").onclick = e => {
+  const tab = e.target.closest("[data-pid]");
+  if (!tab) return;
+  viewing = tab.dataset.pid === me ? null : tab.dataset.pid;
+  render();
+};
 
 function nameOf(pid) {
   if (pid === "display") return "Table";
@@ -685,7 +734,7 @@ let press = null;
 
 function startPress(btn, e) {
   endPress(false);
-  press = {btn, id: e.pointerId, x: e.clientX, y: e.clientY, msg: JSON.parse(btn.dataset.hold), repeating: false};
+  press = {btn, id: e.pointerId, x: e.clientX, y: e.clientY, msg: msgFor(btn), repeating: false};
   btn.classList.add("held");
   press.timer = setTimeout(() => {
     press.repeating = true;
@@ -718,7 +767,7 @@ document.addEventListener("contextmenu", e => { if (e.target.closest("[data-hold
 // Keyboard and screen readers: Enter/Space acts once.
 document.addEventListener("click", e => {
   const btn = e.target.closest("[data-hold]");
-  if (btn && e.detail === 0) act(JSON.parse(btn.dataset.hold));
+  if (btn && e.detail === 0) act(msgFor(btn));
 });
 
 // ---- other controls ------------------------------------------------------------

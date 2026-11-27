@@ -1,26 +1,145 @@
-:root{--bg:#0b0d10;--card:#171a21;--fg:#f4f5f7;--dim:#9aa1ad;--accent:#3e63dd;--warn:#ffb224}
- *{box-sizing:border-box}
- html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
- body{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;
-   padding:40px 16px;background:radial-gradient(ellipse 90% 60% at 50% 0%,#1b2233 0%,var(--bg) 70%)}
- .hero{text-align:center;margin-bottom:clamp(28px,6vh,64px)}
- .hero .pips{font-size:clamp(30px,4.5vw,60px);gap:.35em;margin-bottom:.35em}
- h1{margin:0;font-size:clamp(52px,9vw,136px);font-weight:900;letter-spacing:-.02em;line-height:1}
- .tag{margin:.55em 0 0;font-size:clamp(18px,2.4vw,30px);color:var(--dim)}
- .cards{display:grid;grid-template-columns:repeat(2,minmax(0,440px));gap:24px;width:100%;justify-content:center}
- .card{background:var(--card);border-radius:20px;padding:28px;display:flex;flex-direction:column;gap:14px}
- .card h2{margin:0;font-size:26px}
- .card p{margin:0;color:var(--dim);font-size:17px;line-height:1.45}
- .btn{min-height:64px;border:0;border-radius:14px;font:inherit;font-size:22px;font-weight:800;color:#fff;
-   background:var(--accent);cursor:pointer;margin-top:auto}
- .btn:disabled{opacity:.5;cursor:default}
- .code{display:flex;gap:10px;margin-top:auto}
- .code input{flex:1;min-width:0;height:64px;border-radius:14px;border:2px solid #343a48;background:#0f1218;color:var(--fg);
-   font:inherit;font-size:32px;font-weight:800;letter-spacing:.3em;text-align:center;text-transform:uppercase}
- .code input::placeholder{color:#3a404c}
- .code input:focus{outline:none;border-color:var(--accent)}
- .code .btn{padding:0 24px;margin-top:0}
- .err{color:var(--warn);font-size:16px;min-height:1.3em}
- .link{min-height:48px;border:0;background:none;color:var(--dim);font:inherit;font-size:17px;text-decoration:underline;cursor:pointer}
- .link:hover{color:var(--fg)}
- @media (max-width:760px){.cards{grid-template-columns:minmax(0,480px)}.join{order:-1}}
+:root {
+  --bg: #0b0d10;
+  --card: #171a21;
+  --fg: #f4f5f7;
+  --dim: #9aa1ad;
+  --accent: #3e63dd;
+  --warn: #ffb224;
+}
+* {
+  box-sizing: border-box;
+}
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+body {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  background: radial-gradient(ellipse 90% 60% at 50% 0%, #1b2233 0%, var(--bg) 70%);
+}
+.hero {
+  text-align: center;
+  margin-bottom: clamp(28px, 6vh, 64px);
+}
+.hero .pips {
+  font-size: clamp(30px, 4.5vw, 60px);
+  gap: .35em;
+  margin-bottom: .35em;
+}
+h1 {
+  margin: 0;
+  font-size: clamp(52px, 9vw, 136px);
+  font-weight: 900;
+  letter-spacing: -.02em;
+  line-height: 1;
+}
+.tag {
+  margin: .55em 0 0;
+  font-size: clamp(18px, 2.4vw, 30px);
+  color: var(--dim);
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 440px));
+  gap: 24px;
+  width: 100%;
+  justify-content: center;
+}
+.card {
+  background: var(--card);
+  border-radius: 20px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.card h2 {
+  margin: 0;
+  font-size: 26px;
+}
+.card p {
+  margin: 0;
+  color: var(--dim);
+  font-size: 17px;
+  line-height: 1.45;
+}
+.btn {
+  min-height: 64px;
+  border: 0;
+  border-radius: 14px;
+  font: inherit;
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--accent);
+  cursor: pointer;
+  margin-top: auto;
+}
+.btn:disabled {
+  opacity: .5;
+  cursor: default;
+}
+.code {
+  display: flex;
+  gap: 10px;
+  margin-top: auto;
+}
+.code input {
+  flex: 1;
+  min-width: 0;
+  height: 64px;
+  border-radius: 14px;
+  border: 2px solid #343a48;
+  background: #0f1218;
+  color: var(--fg);
+  font: inherit;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: .3em;
+  text-align: center;
+  text-transform: uppercase;
+}
+.code input::placeholder {
+  color: #3a404c;
+}
+.code input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.code .btn {
+  padding: 0 24px;
+  margin-top: 0;
+}
+.err {
+  color: var(--warn);
+  font-size: 16px;
+  min-height: 1.3em;
+}
+.link {
+  min-height: 48px;
+  border: 0;
+  background: none;
+  color: var(--dim);
+  font: inherit;
+  font-size: 17px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.link:hover {
+  color: var(--fg);
+}
+@media (max-width: 760px) {
+  .cards {
+    grid-template-columns: minmax(0, 480px);
+  }
+  .join {
+    order: -1;
+  }
+}

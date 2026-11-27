@@ -26,10 +26,10 @@ Open `http://<host>:8000/` on the TV and click **Start a game**; that screen bec
 
 ## Deploying
 
-The app runs as one Docker container (see `Dockerfile` and `docker-compose.yml`), behind a reverse proxy for HTTPS.
+The app runs as one Docker container (see `Dockerfile` and `docker-compose.yml`), behind a reverse proxy or tunnel for HTTPS.
 
 1. Copy `deploy.sh.example` to `deploy.sh`, set `HOST` and `REMOTE_DIR`, and run `sh deploy.sh`. It rsyncs the source to the server and runs `docker compose up -d --build` there. A redeploy ends any games in progress, because rooms live in memory.
-2. In Nginx Proxy Manager, add a proxy host for the subdomain: scheme `http`, forward to the Docker host's IP on port `8086` (the host port in `docker-compose.yml`), and turn on **Websockets Support**. On the SSL tab, request a Let's Encrypt certificate and turn on **Force SSL**.
+2. Put a reverse proxy or a tunnel (Caddy, Nginx, Traefik, Cloudflare Tunnel, Tailscale Funnel, etc.) in front of the container's host port, set in `docker-compose.yml`, over plain HTTP. It must pass WebSocket upgrades through for `/ws/`, and it should serve HTTPS (see below).
 
 Keep it to one worker (`--workers 1`, already set in the Dockerfile). One process hosts any number of rooms at once, but they live in its memory, so a second worker would have its own separate set of rooms.
 

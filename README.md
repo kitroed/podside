@@ -1,5 +1,7 @@
 # Podside
 
+<img src="static/icon.svg" alt="Podside icon: six colored spheres seated around a TV" width="128" align="right">
+
 A life tracker for in-person Commander (EDH) games of Magic: The Gathering, built for pods of three or more. A shared **table display** (TV, monitor or tablet in a browser) shows every player's totals, and each player updates totals from **their phone**, the way Jackbox works.
 
 It runs as one small Python process with no accounts and no database, so it's easy to host on a home server and use over the local network.

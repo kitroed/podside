@@ -1,12 +1,6 @@
 "use strict";
-// The server only serves this page for a room that exists.
-const CODE = decodeURIComponent(location.pathname.split("/").pop()).toUpperCase();
-const $ = id => document.getElementById(id);
 document.title = `Room ${CODE} · Podside`;
 $("roomCode").textContent = CODE;
-const ESCAPES = {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"};
-const esc = s => String(s).replace(/[&<>"']/g, c => ESCAPES[c]);
-const colorOf = pid => COLORS[(parseInt(pid.slice(1), 10) - 1) % COLORS.length];
 const STARTING_LIFE_PRESETS = [20, 25, 30, 40];
 // The server draws the QR code; we pass the address this page was opened at so it matches the proxy's domain.
 const QR_SRC = `/api/rooms/${CODE}/qr.svg?base=${encodeURIComponent(location.origin)}`;
@@ -77,8 +71,6 @@ function tile(p, names) {
     ${delta && delta.pid === p.id ? deltaHtml() : ""}
   </section>`;
 }
-
-const signed = n => (n > 0 ? "+" : "−") + Math.abs(n);
 
 function trackDelta() {
   // Show a bubble only for a new action or a growing group, never for an undo or on (re)connect.

@@ -1,17 +1,10 @@
 "use strict";
-// The server only serves this page for a room that exists.
-const CODE = decodeURIComponent(location.pathname.split("/").pop()).toUpperCase();
 const TOKEN_KEY = "podside-token-" + CODE;
 const HOLD_DELAY = 400, HOLD_EVERY = 120;  // ms before repeating, then between repeats
 
-const $ = id => document.getElementById(id);
 document.title = `Room ${CODE} · Podside`;
 $("roomCode").textContent = CODE;
 $("joinCode").textContent = CODE;
-const ESCAPES = {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"};
-const esc = s => String(s).replace(/[&<>"']/g, c => ESCAPES[c]);
-const colorOf = pid => COLORS[(parseInt(pid.slice(1), 10) - 1) % COLORS.length];
-const signed = n => (n > 0 ? "+" : "−") + Math.abs(n);
 const store = {
   get() {
     try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }

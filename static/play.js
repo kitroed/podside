@@ -8,12 +8,17 @@ const $ = id => document.getElementById(id);
 document.title = `Room ${CODE} · Podside`;
 $("roomCode").textContent = CODE;
 $("joinCode").textContent = CODE;
-const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ESCAPES = {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"};
+const esc = s => String(s).replace(/[&<>"']/g, c => ESCAPES[c]);
 const colorOf = pid => COLORS[(parseInt(pid.slice(1), 10) - 1) % COLORS.length];
 const signed = n => (n > 0 ? "+" : "−") + Math.abs(n);
 const store = {
-  get() { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } },
-  set(v) { try { localStorage.setItem(TOKEN_KEY, v); } catch {} },
+  get() {
+    try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+  },
+  set(v) {
+    try { localStorage.setItem(TOKEN_KEY, v); } catch {}
+  },
 };
 
 let ws = null, state = null, me = null, retry = 0, gone = false, cmdKey = null, whoKey = null;
@@ -32,27 +37,39 @@ const msgFor = btn => ({...JSON.parse(btn.dataset.hold), target: viewId()});
 function connect() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const token = store.get();
-  ws = new WebSocket(`${proto}://${location.host}/ws/${CODE}?role=player` + (token ? `&token=${encodeURIComponent(token)}` : ""));
+  const query = "role=player" + (token ? `&token=${encodeURIComponent(token)}` : "");
+  ws = new WebSocket(`${proto}://${location.host}/ws/${CODE}?${query}`);
   ws.onopen = () => { retry = 0; $("status").hidden = true; };
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
-    if (m.type === "welcome") { me = m.player_id; store.set(m.token); }
-    else if (m.type === "state") { state = m.state; render(); }
-    else if (m.type === "error") {
+    if (m.type === "welcome") {
+      me = m.player_id;
+      store.set(m.token);
+    } else if (m.type === "state") {
+      state = m.state;
+      render();
+    } else if (m.type === "error") {
       if (m.message === "Room not found") gone = true;
       toast(m.message);
     }
   };
   ws.onclose = () => {
     endPress(false);
-    if (gone) { show("msg"); $("loading").textContent = "This room has ended. Ask for a new link."; return; }
+    if (gone) {
+      show("msg");
+      $("loading").textContent = "This room has ended. Ask for a new link.";
+      return;
+    }
     $("status").hidden = false;
     setTimeout(connect, Math.min(1000 * 2 ** retry++, 8000));
   };
 }
 
 function act(msg) {
-  if (ws && ws.readyState === 1) { ws.send(JSON.stringify(msg)); return true; }
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify(msg));
+    return true;
+  }
   toast("Not connected yet");
   return false;
 }
@@ -72,7 +89,7 @@ function render() {
     $("joinNote").textContent = me ? "You were removed from this game. Join again to get a new seat."
                                    : "Your name shows on the table display.";
     renderSeatPick();
-    if ($("join").hidden) { show("join"); }
+    if ($("join").hidden) show("join");
     return;
   }
   show("game");
@@ -91,7 +108,8 @@ function render() {
   $("outnote").hidden = !v.eliminated;
   $("outnote").textContent = mine ? "You're out" : `${v.name} is out`;
   $("poison").textContent = v.poison;
-  $("poison").className = "val" + (v.poison >= POISON_LETHAL ? " lethal" : v.poison >= POISON_LETHAL - 3 ? " warn" : "");
+  const poisonCls = v.poison >= POISON_LETHAL ? " lethal" : v.poison >= POISON_LETHAL - 3 ? " warn" : "";
+  $("poison").className = "val" + poisonCls;
   $("cmdTitle").textContent = mine ? "Commander damage taken" : `Commander damage ${v.name} took`;
   $("removeOther").hidden = mine;
   if (!$("removeOther").dataset.armed) $("removeOther").textContent = `Remove ${v.name} from the game`;
@@ -103,14 +121,16 @@ function render() {
   const key = v.id + "/" + state.players.map(o => `${o.id}:${o.name}`).join("|");
   if (key !== cmdKey) {
     cmdKey = key;
+    const hold = (src, delta) => `data-hold='{"type":"cmd_damage","source":"${src}","delta":${delta}}'`;
     const row = (o, label, aria, id = "") => `<div class="row" ${id} style="--src:${colorOf(o.id)}">
       <span class="lbl"><span class="dot"></span>${label}</span>
-      <button data-hold='{"type":"cmd_damage","source":"${o.id}","delta":-1}' aria-label="Less damage from ${aria}">−</button>
+      <button ${hold(o.id, -1)} aria-label="Less damage from ${aria}">−</button>
       <span class="val" data-src="${o.id}">0</span>
-      <button data-hold='{"type":"cmd_damage","source":"${o.id}","delta":1}' aria-label="More damage from ${aria}">+</button>
+      <button ${hold(o.id, 1)} aria-label="More damage from ${aria}">+</button>
     </div>`;
+    const ownLabel = `<span class="own">${mine ? "Own" : `${esc(v.name)}'s own`}</span>`;
     $("cmd").innerHTML = others.map(o => row(o, o.id === me ? "You" : esc(o.name), esc(o.name))).join("")
-      + row(v, `<span class="own">${mine ? "Own" : `${esc(v.name)}'s own`}</span>`, "own commander", 'id="ownRow"')
+      + row(v, ownLabel, "own commander", 'id="ownRow"')
       + `<button class="reveal" id="ownReveal">Own commander damage…</button>`
       + (others.length ? "" : `<div class="none">Other players appear here when they join.</div>`);
   }
@@ -139,7 +159,8 @@ function renderUndo() {
   if (undoArmed && undoArmed.key !== undoKey()) disarmUndo();
   b.disabled = !last;
   b.toggleAttribute("data-armed", !!undoArmed);
-  b.textContent = !last ? "Nothing to undo" : undoArmed ? `Tap again to undo: ${describe(last)}` : `Undo: ${describe(last)}`;
+  if (!last) b.textContent = "Nothing to undo";
+  else b.textContent = (undoArmed ? "Tap again to undo: " : "Undo: ") + describe(last);
 }
 
 function renderTabs() {
@@ -151,7 +172,8 @@ function renderTabs() {
   if (key !== whoKey) {  // rebuild only on change so a tap in progress isn't lost
     whoKey = key;
     who.innerHTML = players.map(x => `<button class="tab" data-pid="${x.id}" aria-pressed="${x.id === viewId()}"
-      style="--tc:${colorOf(x.id)}"><span class="n">${x.id === me ? "You" : esc(x.name)}</span><span class="l" data-life="${x.id}"></span></button>`).join("");
+      style="--tc:${colorOf(x.id)}"><span class="n">${x.id === me ? "You" : esc(x.name)}</span>`
+      + `<span class="l" data-life="${x.id}"></span></button>`).join("");
   }
   for (const x of players) who.querySelector(`[data-life="${x.id}"]`).textContent = x.life;
 }
@@ -167,7 +189,10 @@ $("who").onclick = e => {
   if (!tab) return;
   viewing = tab.dataset.pid === me ? null : tab.dataset.pid;
   const rm = $("removeOther");  // disarm a pending "remove" meant for the previous player
-  if (rm.dataset.armed) { clearTimeout(Number(rm.dataset.armed)); delete rm.dataset.armed; }
+  if (rm.dataset.armed) {
+    clearTimeout(Number(rm.dataset.armed));
+    delete rm.dataset.armed;
+  }
   render();
 };
 
@@ -214,7 +239,8 @@ function endPress(isTap) {
   if (!press) return;
   const {btn, msg, repeating, timer} = press;
   press = null;
-  clearTimeout(timer); clearInterval(timer);
+  clearTimeout(timer);
+  clearInterval(timer);
   btn.classList.remove("held");
   if (isTap && !repeating && act(msg)) navigator.vibrate?.(8);
 }
@@ -224,7 +250,8 @@ document.addEventListener("pointerdown", e => {
   if (btn && e.button === 0) startPress(btn, e);
 });
 document.addEventListener("pointermove", e => {
-  if (press && e.pointerId === press.id && Math.hypot(e.clientX - press.x, e.clientY - press.y) > MOVE_SLOP) endPress(false);
+  if (!press || e.pointerId !== press.id) return;
+  if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > MOVE_SLOP) endPress(false);
 });
 document.addEventListener("pointerup", e => { if (press && e.pointerId === press.id) endPress(true); });
 document.addEventListener("pointercancel", () => endPress(false));
@@ -242,7 +269,8 @@ document.addEventListener("click", e => {
 function renderSeatPick() {
   const free = state.players.filter(x => !x.claimed);
   $("seatPick").hidden = !free.length;
-  $("seatList").innerHTML = free.map(x => `<button type="button" data-seat="${esc(x.id)}" style="--tc:${colorOf(x.id)}">
+  $("seatList").innerHTML = free.map(x => `<button type="button" data-seat="${esc(x.id)}"
+    style="--tc:${colorOf(x.id)}">
     <span>${esc(x.name)}</span>${pips(x.colors)}</button>`).join("");
 }
 $("seatList").onclick = e => {
@@ -264,15 +292,17 @@ $("undo").onclick = () => {
     disarmUndo();
     act({type: "undo"});
   } else {
-    undoArmed = {key: undoKey(), timer: setTimeout(() => { undoArmed = null; renderUndo(); }, 3000)};
+    const timer = setTimeout(() => { undoArmed = null; renderUndo(); }, 3000);
+    undoArmed = {key: undoKey(), timer};
   }
   renderUndo();
 };
+
 // ---- name and deck colors ------------------------------------------------------------
 
 function makePicker(el) {
-  el.innerHTML = [..."WUBRGC"].map(c =>
-    `<button type="button" class="pip pip-${c}" data-c="${c}" aria-pressed="false" aria-label="${COLOR_NAMES[c]}">${c}</button>`).join("");
+  el.innerHTML = [..."WUBRGC"].map(c => `<button type="button" class="pip pip-${c}" data-c="${c}"
+    aria-pressed="false" aria-label="${COLOR_NAMES[c]}">${c}</button>`).join("");
   el.addEventListener("click", e => {
     const b = e.target.closest("[data-c]");
     if (!b) return;
@@ -286,7 +316,9 @@ function makePicker(el) {
 }
 const pickerValue = el => [...el.querySelectorAll('[aria-pressed="true"]')].map(b => b.dataset.c).join("");
 function setPicker(el, colors) {
-  for (const b of el.querySelectorAll("[data-c]")) b.setAttribute("aria-pressed", String(colors.includes(b.dataset.c)));
+  for (const b of el.querySelectorAll("[data-c]")) {
+    b.setAttribute("aria-pressed", String(colors.includes(b.dataset.c)));
+  }
 }
 makePicker($("joinColors"));
 makePicker($("editColors"));
@@ -311,7 +343,10 @@ function twoTap(btn, armedText, run) {
   }
   btn.dataset.label = btn.textContent;
   btn.textContent = armedText;
-  btn.dataset.armed = setTimeout(() => { delete btn.dataset.armed; btn.textContent = btn.dataset.label; }, 3000);
+  btn.dataset.armed = setTimeout(() => {
+    delete btn.dataset.armed;
+    btn.textContent = btn.dataset.label;
+  }, 3000);
 }
 $("removeOther").onclick = () => {
   const target = viewId(), v = state.players.find(x => x.id === target);
@@ -327,7 +362,10 @@ $("leave").onclick = () => twoTap($("leave"), "Tap again to leave", () => {
 });
 $("edit").addEventListener("close", () => {
   const b = $("leave");
-  if (b.dataset.armed) { clearTimeout(Number(b.dataset.armed)); delete b.dataset.armed; }
+  if (b.dataset.armed) {
+    clearTimeout(Number(b.dataset.armed));
+    delete b.dataset.armed;
+  }
   b.textContent = "Leave this game";
 });
 $("editForm").onsubmit = e => {
@@ -350,14 +388,23 @@ async function keepAwake() {
   if (!("wakeLock" in navigator) || document.visibilityState !== "visible") return;
   if (wakePending || (wakeLock && !wakeLock.released)) return;
   wakePending = true;
-  try { wakeLock = await navigator.wakeLock.request("screen"); } catch {} finally { wakePending = false; }
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+  } catch {
+    // not granted (no HTTPS, or no tap yet); the next tap tries again
+  } finally {
+    wakePending = false;
+  }
 }
 document.addEventListener("visibilitychange", () => { if (me) keepAwake(); });
 document.addEventListener("pointerdown", () => { if (me) keepAwake(); });
 
 // Full screen works on Android and iPad; iPhones only allow it for video, so the button stays hidden there.
-const FS_ENTER = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
-const FS_EXIT = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>';
+const fsIcon = path => '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"'
+  + ' stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + `<path d="${path}"/></svg>`;
+const FS_ENTER = fsIcon("M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5");  // corners pointing out
+const FS_EXIT = fsIcon("M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5");  // corners pointing in
 const root = document.documentElement;
 const inFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
 function syncFullscreenButton() {
@@ -375,13 +422,17 @@ $("fs").onclick = () => {
   const request = root.requestFullscreen || root.webkitRequestFullscreen;
   Promise.resolve(request.call(root)).catch(() => toast("Full screen isn't available here"));
 };
-for (const ev of ["fullscreenchange", "webkitfullscreenchange"]) document.addEventListener(ev, syncFullscreenButton);
+for (const ev of ["fullscreenchange", "webkitfullscreenchange"]) {
+  document.addEventListener(ev, syncFullscreenButton);
+}
 syncFullscreenButton();
 
 let toastTimer = null;
 function toast(msg) {
-  $("toast").textContent = msg; $("toast").hidden = false;
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => { $("toast").hidden = true; }, 3500);
+  $("toast").textContent = msg;
+  $("toast").hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { $("toast").hidden = true; }, 3500);
 }
 
 connect();

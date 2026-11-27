@@ -23,9 +23,16 @@ $("resumeFile").onchange = async () => {
   if (!file) return;
   $("startErr").textContent = "";
   try {
-    const r = await fetch("/api/rooms/resume", {method: "POST", headers: {"Content-Type": "application/json"}, body: await file.text()});
+    const r = await fetch("/api/rooms/resume", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: await file.text(),
+    });
     const body = await r.json().catch(() => ({}));
-    if (!r.ok) { $("startErr").textContent = body.detail || "Couldn't resume that game."; return; }
+    if (!r.ok) {
+      $("startErr").textContent = body.detail || "Couldn't resume that game.";
+      return;
+    }
     location.href = body.display_url;
   } catch {
     $("startErr").textContent = "Couldn't reach the server. Try again.";
@@ -42,7 +49,10 @@ $("joinForm").onsubmit = async e => {
   if (code.length !== 4) { $("joinErr").textContent = "Room codes are 4 letters."; return; }
   try {
     const r = await fetch(`/api/rooms/${code}`);
-    if (r.status === 404) { $("joinErr").textContent = `No game with code ${code}. Check the TV.`; return; }
+    if (r.status === 404) {
+      $("joinErr").textContent = `No game with code ${code}. Check the TV.`;
+      return;
+    }
     if (!r.ok) throw new Error(r.status);
     location.href = `/play/${code}`;
   } catch {

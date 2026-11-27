@@ -4,7 +4,8 @@ const CODE = decodeURIComponent(location.pathname.split("/").pop()).toUpperCase(
 const $ = id => document.getElementById(id);
 document.title = `Room ${CODE} · Podside`;
 $("roomCode").textContent = CODE;
-const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ESCAPES = {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"};
+const esc = s => String(s).replace(/[&<>"']/g, c => ESCAPES[c]);
 const colorOf = pid => COLORS[(parseInt(pid.slice(1), 10) - 1) % COLORS.length];
 const STARTING_LIFE_PRESETS = [20, 25, 30, 40];
 // The server draws the QR code; we pass the address this page was opened at so it matches the proxy's domain.
@@ -32,7 +33,10 @@ function connect() {
     setTimeout(connect, Math.min(1000 * 2 ** retry++, 8000));
   };
 }
-const act = msg => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); else toast("Not connected"); };
+function act(msg) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+  else toast("Not connected");
+}
 
 // ---- rendering ----------------------------------------------------------------
 
@@ -55,14 +59,17 @@ function tile(p, names) {
   for (const [src, d] of Object.entries(p.cmd_damage)) {
     const cls = d >= CMD_LETHAL ? "lethal" : d >= CMD_LETHAL - 6 ? "warn" : "";
     const label = src === p.id ? "Own" : esc(names[src] || src);
-    extras.push(`<span class="pill cmd ${cls}" style="--src:${colorOf(src)}"><span class="k">${label}</span>${d}</span>`);
+    extras.push(`<span class="pill cmd ${cls}" style="--src:${colorOf(src)}">`
+      + `<span class="k">${label}</span>${d}</span>`);
   }
   for (const [name, n] of Object.entries(p.counters)) {
-    extras.push(`<span class="pill"><span class="k">${esc(name[0].toUpperCase() + name.slice(1))}</span>${n}</span>`);
+    const label = esc(name[0].toUpperCase() + name.slice(1));
+    extras.push(`<span class="pill"><span class="k">${label}</span>${n}</span>`);
   }
   const out = p.eliminated, low = !out && p.life <= 10 ? "low" : "";
   const bottom = out ? `<span class="pill">${esc(outReason(p, names))}</span>` : extras.join("");
-  return `<section class="tile ${out ? "out" : ""} ${p.claimed ? "" : "unclaimed"}" data-pid="${esc(p.id)}" style="--c:${colorOf(p.id)}">
+  const cls = `tile ${out ? "out" : ""} ${p.claimed ? "" : "unclaimed"}`;
+  return `<section class="${cls}" data-pid="${esc(p.id)}" style="--c:${colorOf(p.id)}">
     <div class="name">${esc(p.name)}</div>
     ${pips(p.colors)}
     <div class="life ${low}">${out ? "OUT" : p.life}</div>
@@ -81,11 +88,18 @@ function trackDelta() {
   if (key && (!seen || key.seq >= seen.seq)) seen = key;
   if (!fresh) {
     // Drop a bubble whose action was just undone; keep it through unrelated updates like renames.
-    if (delta && !(la && la.seq === delta.seq && la.action.delta === delta.d)) { delta = null; clearTimeout(deltaTimer); }
+    if (delta && !(la && la.seq === delta.seq && la.action.delta === delta.d)) {
+      delta = null;
+      clearTimeout(deltaTimer);
+    }
     return;
   }
   const a = la.action, d = Number(a.delta);
-  if (!("delta" in a)) { delta = null; clearTimeout(deltaTimer); return; }  // e.g. a removal
+  if (!("delta" in a)) {  // e.g. a removal
+    delta = null;
+    clearTimeout(deltaTimer);
+    return;
+  }
   const [text, gain] = a.type === "life" ? [signed(d), d > 0]
     : a.type === "cmd_damage" ? [`${signed(-d)}<small>cmd</small>`, d < 0]
     : a.type === "poison" ? [`${signed(d)}<small>poison</small>`, d < 0]
@@ -97,7 +111,8 @@ function trackDelta() {
 
 function deltaHtml() {
   const age = Date.now() - delta.start;  // keeps the fade in step when tiles re-render
-  return `<div class="delta ${delta.gain ? "gain" : "loss"}" style="--ms:${DELTA_MS}ms;--age:-${age}ms">${delta.text}</div>`;
+  const style = `--ms:${DELTA_MS}ms;--age:-${age}ms`;
+  return `<div class="delta ${delta.gain ? "gain" : "loss"}" style="${style}">${delta.text}</div>`;
 }
 
 function render() {
@@ -147,8 +162,10 @@ function joinHtml() {
 let toastTimer = null;
 function toast(msg, ms = 4000) {
   const t = $("toast");
-  t.textContent = msg; t.hidden = false;
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, ms);
+  t.textContent = msg;
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, ms);
 }
 
 // ---- admin panel --------------------------------------------------------------
@@ -163,7 +180,9 @@ for (const b of document.querySelectorAll("[data-life]")) {
   b.onclick = () => {
     // Step through common formats rather than one point at a time.
     const cur = state.starting_life, up = b.dataset.life === "1";
-    const next = up ? STARTING_LIFE_PRESETS.find(v => v > cur) : [...STARTING_LIFE_PRESETS].reverse().find(v => v < cur);
+    const next = up
+      ? STARTING_LIFE_PRESETS.find(v => v > cur)
+      : [...STARTING_LIFE_PRESETS].reverse().find(v => v < cur);
     if (next) act({type: "settings", starting_life: next});
   };
 }
@@ -173,18 +192,21 @@ function renderSeats() {
   const ps = state.players;
   $("seats").innerHTML = ps.length ? ps.map((p, i) => {
     const armed = removeArmed === p.id, name = esc(p.name);
+    const first = i === 0 ? "disabled" : "", last = i === ps.length - 1 ? "disabled" : "";
+    const label = armed ? "Tap again" : "Remove";
     return `<div class="seat" style="--c:${colorOf(p.id)}">
       <span class="nm"><span class="dot"></span><span>${name}</span></span>
-      <button class="btn" data-move="${p.id}" data-dir="-1" aria-label="Move ${name} earlier" ${i === 0 ? "disabled" : ""}>▲</button>
-      <button class="btn" data-move="${p.id}" data-dir="1" aria-label="Move ${name} later" ${i === ps.length - 1 ? "disabled" : ""}>▼</button>
-      <button class="btn ${armed ? "danger" : ""}" data-remove="${p.id}" aria-label="Remove ${name}">${armed ? "Tap again" : "Remove"}</button>
+      <button class="btn" data-move="${p.id}" data-dir="-1" aria-label="Move ${name} earlier" ${first}>▲</button>
+      <button class="btn" data-move="${p.id}" data-dir="1" aria-label="Move ${name} later" ${last}>▼</button>
+      <button class="btn ${armed ? "danger" : ""}" data-remove="${p.id}" aria-label="Remove ${name}">${label}</button>
     </div>`;
   }).join("") : `<span class="lbl">No players yet</span>`;
 }
 $("seats").onclick = e => {
   const move = e.target.closest("[data-move]");
   if (move) {
-    const order = state.players.map(p => p.id), i = order.indexOf(move.dataset.move), j = i + Number(move.dataset.dir);
+    const order = state.players.map(p => p.id);
+    const i = order.indexOf(move.dataset.move), j = i + Number(move.dataset.dir);
     if (i < 0 || j < 0 || j >= order.length) return;
     [order[i], order[j]] = [order[j], order[i]];
     act({type: "reorder", order});
@@ -206,8 +228,11 @@ $("seats").onclick = e => {
 $("reset").onclick = () => {
   const b = $("reset");
   if (resetArmed) {
-    clearTimeout(resetArmed); resetArmed = null; b.textContent = "New game";
-    act({type: "reset"}); $("panel").close();
+    clearTimeout(resetArmed);
+    resetArmed = null;
+    b.textContent = "New game";
+    act({type: "reset"});
+    $("panel").close();
     return;
   }
   b.textContent = "Tap again";
@@ -224,15 +249,22 @@ let wakeLock = null;
 async function keepAwake() {
   if (!("wakeLock" in navigator)) return false;
   if (wakeLock && !wakeLock.released) return true;
-  try { wakeLock = await navigator.wakeLock.request("screen"); return true; }
-  catch { return false; }
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+    return true;
+  } catch {
+    return false;
+  }
 }
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") keepAwake(); });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") keepAwake();
+});
 document.addEventListener("click", keepAwake);  // some browsers only grant it after a tap
 keepAwake().then(ok => {
-  if (!ok && !window.isSecureContext) toast("This screen may sleep: keeping it awake needs HTTPS or localhost", 10000);
+  if (!ok && !window.isSecureContext) {
+    toast("This screen may sleep: keeping it awake needs HTTPS or localhost", 10000);
+  }
 });
-
 
 // Names are centered under the tile's top edge; deck pips sit in the top-right corner. If a name
 // runs into the pips, shorten it (symmetrically, so it stays centered) to end just before them,
@@ -242,7 +274,8 @@ function fitNames() {
     const name = t.querySelector(".name"), pipsEl = t.querySelector(":scope > .pips");
     name.style.maxWidth = name.style.marginTop = "";
     if (!pipsEl) continue;
-    const nr = name.getBoundingClientRect(), pr = pipsEl.getBoundingClientRect(), tr = t.getBoundingClientRect();
+    const nr = name.getBoundingClientRect(), pr = pipsEl.getBoundingClientRect();
+    const tr = t.getBoundingClientRect();
     const gap = pr.height * 0.4;
     if (pr.bottom <= nr.top || nr.right <= pr.left - gap) continue;  // already clear
     const room = 2 * (pr.left - gap - (tr.left + tr.width / 2));

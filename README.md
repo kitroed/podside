@@ -140,11 +140,10 @@ Connect to `/ws/{code}?role=display` or `/ws/{code}?role=player[&token=...]`. Al
 | `models.py` | Config constants, `ActionError`, and the domain model: `Player`, `Change`, `LogEntry`, `Room` (state, apply/commit/undo/reset) |
 | `rooms.py` | `RoomManager` and the shared `manager`: create/get rooms, idle cleanup |
 | `actions.py` | `handle_action()`: validates and applies each action type |
-| `app.py` | FastAPI routes, the `/ws/{code}` endpoint, `broadcast_state()`, and serving the pages |
+| `main.py` | The FastAPI `app` (start here; `uvicorn main:app` runs it): routes, the `/ws/{code}` endpoint, `broadcast_state()`, and serving the pages |
 | `static/` | The pages as plain files: `index`, `display` and `play` (`.html`, `.css`, `.js` each), plus `pips.css` (deck color pips) and `shared.js` (the room code, small helpers, pips and the save link, used by the display and player pages). The app icon is `icon.svg`; `favicon-32.png`, `icon-192.png` and `apple-touch-icon.png` (180 px, for iPhone home screens) are rendered from it, so re-render them if it changes. The pages read the room code from their URL |
 | `saves.py` | Save files: `dump()` a room, `parse()` and check an upload, `restore()` it into a new room |
 | `qr.py` | Small QR encoder (byte mode, level M) with no dependencies, used for the join code |
-| `main.py` | Entry point that re-exports `app`, so `uvicorn main:app` works |
 | `tests/` | pytest suite. `conftest.py` has a `Table` helper that drives a display and several players over real WebSockets |
 
 Run the tests with `pip install pytest && pytest -q`.
